@@ -9,6 +9,5 @@ import (
 func main() {
 	port := ":8000"
 	srv := server.NewServer()
-	log.Printf("server starting on %s", port)
 	log.Fatal(srv.Run(port))
 }
