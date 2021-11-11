@@ -21,12 +21,14 @@ func (us *UserService) CreateUser(_ context.Context, user *conduit.User) error {
 	return nil
 }
 
-// func (us *UserService) Authenticate(_ context.Context, user *conduit.User) (*conduit.User, error) {
-// 	user.CreatedAt = time.Now()
-// 	user.UpdatedAt = time.Now()
-// 	us.users = append(us.users, user)
-// 	return nil
-// }
+func (us *UserService) Authenticate(ctx context.Context, email, password string) (*conduit.User, error) {
+	user, _ := us.UserByEmail(ctx, email)
+	if user.VerifyPassword(password) {
+		user.Token = "xyz"
+		return user, nil
+	}
+	return nil, errors.New("invalid credentials")
+}
 
 func (us *UserService) UserByEmail(_ context.Context, email string) (*conduit.User, error) {
 	for _, user := range us.users {

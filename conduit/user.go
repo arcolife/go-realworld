@@ -47,8 +47,12 @@ func (u User) VerifyPassword(password string) bool {
 
 type UserService interface {
 	CreateUser(context.Context, *User) error
+
 	//UserByID(context.Context, uint) (*User, error)
+
 	UserByEmail(context.Context, string) (*User, error)
+
 	//Users(context.Context, UserFilter) ([]*User, error)
-	//Authenticate(email, password string) (*User, error)
+
+	Authenticate(ctx context.Context, email, password string) (*User, error)
 }

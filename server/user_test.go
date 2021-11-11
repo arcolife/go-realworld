@@ -27,6 +27,10 @@ func (m *MockUserService) UserByEmail(_ context.Context, email string) (*conduit
 	return m.UserByEmailFn(email), nil
 }
 
+func (m *MockUserService) Authenticate(_ context.Context, email, password string) (*conduit.User, error) {
+	return nil, nil
+}
+
 func Test_createUser(t *testing.T) {
 	userStore := &MockUserService{}
 	srv := &Server{
@@ -65,6 +69,10 @@ func Test_createUser(t *testing.T) {
 	if !reflect.DeepEqual(expectedResp, gotResp) {
 		t.Errorf("expected response %v, but got %v", expectedResp, gotResp)
 	}
+}
+
+func Test_loginUser(t *testing.T) {
+
 }
 
 func extractResponseBody(body io.Reader, v interface{}) {

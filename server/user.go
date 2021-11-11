@@ -77,7 +77,7 @@ func (s *Server) loginUser() http.HandlerFunc {
 	type Input struct {
 		User struct {
 			Email    string `json:"email" validate:"required,email"`
-			Username string `json:"username" validate:"required,min=2"`
+			Password string `json:"password" validate:"required,min=8,max=72"`
 		} `json:"user" validate:"required"`
 	}
 
@@ -94,11 +94,15 @@ func (s *Server) loginUser() http.HandlerFunc {
 			return
 		}
 
-		// authenticate user
+		user, err := s.userService.Authenticate(r.Context(), input.User.Email, input.User.Password)
 
-		// create token
+		if err != nil {
+			// unauthorized request
+			return
+		}
 
-		// return response
-
+		if err := writeJSON(w, http.StatusOK, M{"user": userResponse(user)}); err != nil {
+			log.Printf("json endcoding error: %v", err)
+		}
 	}
 }

@@ -6,5 +6,6 @@ func (s *Server) routes() {
 	{
 		apiRouter.Handle("/health", healthCheck())
 		apiRouter.Handle("/users", s.createUser())
+		apiRouter.Handle("/users/login", s.loginUser())
 	}
 }
