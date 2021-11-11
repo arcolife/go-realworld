@@ -24,7 +24,6 @@ func (us *UserService) CreateUser(_ context.Context, user *conduit.User) error {
 func (us *UserService) Authenticate(ctx context.Context, email, password string) (*conduit.User, error) {
 	user, _ := us.UserByEmail(ctx, email)
 	if user.VerifyPassword(password) {
-		user.Token = "xyz"
 		return user, nil
 	}
 	return nil, errors.New("invalid credentials")

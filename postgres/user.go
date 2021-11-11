@@ -2,23 +2,33 @@ package postgres
 
 import (
 	"context"
-	"errors"
 
 	"github.com/0xdod/go-realworld/conduit"
-	"github.com/golang-jwt/jwt"
+	"github.com/jmoiron/sqlx"
 )
 
-var hmacSampleSecret = []byte("sample-secret")
-
 type UserService struct {
+	db *DB
 }
 
-func NewUserService() *UserService {
-	return nil
+func NewUserService(db *DB) *UserService {
+	return &UserService{db}
 }
 
 func (us *UserService) CreateUser(ctx context.Context, user *conduit.User) error {
-	return nil
+	tx, err := us.db.BeginTxx(ctx, nil)
+
+	if err != nil {
+		return err
+	}
+
+	defer tx.Rollback()
+
+	if err := createUser(ctx, tx, user); err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func (us *UserService) Authenticate(ctx context.Context, email, password string) (*conduit.User, error) {
@@ -29,22 +39,8 @@ func (us *UserService) Authenticate(ctx context.Context, email, password string)
 	}
 
 	if !user.VerifyPassword(password) {
-		return nil, errors.New("invalid credentials")
+		return nil, conduit.ErrUnAuthorized
 	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id": user.ID,
-	})
-
-	tokenString, err := token.SignedString(hmacSampleSecret)
-
-	if err != nil {
-		return nil, err
-	}
-
-	user.Token = tokenString
-
-	// update user
 
 	return user, nil
 }
@@ -59,4 +55,35 @@ func (us *UserService) Users(ctx context.Context, uf conduit.UserFilter) ([]*con
 
 func (us *UserService) UserByID(ctx context.Context, id uint) (*conduit.User, error) {
 	return nil, nil
+}
+
+func createUser(ctx context.Context, tx *sqlx.Tx, user *conduit.User) error {
+	// Execute insertion query.
+	query := `
+	INSERT INTO users (email, username, bio, image, password_hash)
+	VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at
+	`
+	args := []interface{}{user.Email, user.Username, user.Bio, user.Image, user.PasswordHash}
+	err := tx.QueryRowxContext(ctx, query, args...).Scan(&user.ID, &user.CreatedAt)
+
+	if err != nil {
+		switch {
+		case err.Error() == `pq: duplicate key value violates unique constraint "users_email_key"`:
+			return conduit.ErrDuplicateEmail
+		case err.Error() == `pq: duplicate key value violates unique constraint "users_username_key"`:
+			return conduit.ErrDuplicateUsername
+		default:
+			return err
+		}
+	}
+
+	query = `UPDATE users SET updated_at = $1 where id = $2`
+
+	err = tx.QueryRowxContext(ctx, query, user.CreatedAt, user.ID).Err()
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

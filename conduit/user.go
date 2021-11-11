@@ -13,7 +13,6 @@ type User struct {
 	Username     string    `json:"username,omitempty"`
 	Bio          string    `json:"bio,omitempty"`
 	Image        string    `json:"image,omitempty"`
-	Token        string    `json:"token,omitempty"`
 	PasswordHash string    `json:"-"`
 	CreatedAt    time.Time `json:"createdAt,omitempty"`
 	UpdatedAt    time.Time `json:"updatedAt,omitempty"`
@@ -23,7 +22,6 @@ type UserFilter struct {
 	ID       *uint   `json:"id"`
 	Email    *string `json:"email"`
 	Username *string `json:"username"`
-	Token    *string `json:"token"`
 }
 
 func (u *User) SetPassword(password string) error {

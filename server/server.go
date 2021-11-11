@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/0xdod/go-realworld/conduit"
-	"github.com/0xdod/go-realworld/inmem"
+	"github.com/0xdod/go-realworld/postgres"
 	"github.com/gorilla/mux"
 )
 
@@ -16,7 +16,7 @@ type Server struct {
 	userService conduit.UserService
 }
 
-func NewServer() *Server {
+func NewServer(db *postgres.DB) *Server {
 	s := Server{
 		server: &http.Server{
 			WriteTimeout: 5 * time.Second,
@@ -27,7 +27,7 @@ func NewServer() *Server {
 	}
 
 	s.routes()
-	s.userService = &inmem.UserService{}
+	s.userService = postgres.NewUserService(db)
 
 	s.server.Handler = s.router
 
