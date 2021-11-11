@@ -5,12 +5,15 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/0xdod/go-realworld/conduit"
+	"github.com/0xdod/go-realworld/inmem"
 	"github.com/gorilla/mux"
 )
 
 type Server struct {
-	server *http.Server
-	router *mux.Router
+	server      *http.Server
+	router      *mux.Router
+	userService conduit.UserService
 }
 
 func NewServer() *Server {
@@ -24,6 +27,8 @@ func NewServer() *Server {
 	}
 
 	s.routes()
+	s.userService = &inmem.UserService{}
+
 	s.server.Handler = s.router
 
 	return &s
@@ -37,22 +42,11 @@ func (s *Server) Run(port string) error {
 
 func healthCheck() http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		resp := RM{
-			Status:  "success",
-			Message: "healthy",
-			Data:    M{"hello": "world"},
+		resp := M{
+			"status":  "available",
+			"message": "healthy",
+			"data":    M{"hello": "beautiful"},
 		}
 		writeJSON(rw, http.StatusOK, resp)
-	})
-}
-
-func errorCheck() http.Handler {
-	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		err := Error{
-			Code:    "internal",
-			Message: "internal server error.",
-		}
-
-		errorResponse(rw, http.StatusInternalServerError, err)
 	})
 }

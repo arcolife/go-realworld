@@ -5,6 +5,6 @@ func (s *Server) routes() {
 
 	{
 		apiRouter.Handle("/health", healthCheck())
-		apiRouter.Handle("/error", errorCheck())
+		apiRouter.Handle("/users", s.createUser())
 	}
 }
