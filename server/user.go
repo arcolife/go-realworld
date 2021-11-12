@@ -8,7 +8,6 @@ import (
 
 	"github.com/0xdod/go-realworld/conduit"
 	"github.com/go-playground/validator/v10"
-	"github.com/golang-jwt/jwt"
 )
 
 var validate *validator.Validate
@@ -25,10 +24,9 @@ func init() {
 }
 
 func userResponse(_user *conduit.User, _token ...string) M {
-	if _user.IsAnonymous() {
+	if _user == nil {
 		return nil
 	}
-
 	var token string
 	if len(_token) > 0 {
 		token = _token[0]
@@ -148,41 +146,53 @@ func (s *Server) getCurrentUser() http.HandlerFunc {
 	}
 }
 
-var hmacSampleSecret = []byte("sample-secret")
-
-func generateUserToken(user *conduit.User) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"id":    user.ID,
-		"email": user.Email,
-	})
-
-	tokenString, err := token.SignedString(hmacSampleSecret)
-
-	if err != nil {
-		return "", err
+func (s *Server) updateUser() http.HandlerFunc {
+	type Input struct {
+		User struct {
+			Email    *string `json:"email,omitempty"`
+			Username *string `json:"username,omitempty"`
+			Bio      *string `json:"bio,omitempty"`
+			Image    *string `json:"image,omitempty"`
+			Password *string `json:"password,omitempty"`
+		} `json:"user,omitempty" validate:"required"`
 	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		input := &Input{}
 
-	return tokenString, nil
-}
-
-func parseUserToken(tokenStr string) (userClaims M, err error) {
-	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, conduit.ErrUnAuthorized
+		if err := readJSON(r.Body, &input); err != nil {
+			errorResponse(w, http.StatusUnprocessableEntity, err)
+			return
 		}
 
-		return hmacSampleSecret, nil
-	})
+		if err := validate.Struct(input.User); err != nil {
+			validationError(w, err)
+			return
+		}
 
-	if err != nil {
-		return nil, err
+		ctx := r.Context()
+		user := userFromContext(ctx)
+		patch := conduit.UserPatch{
+			Username: input.User.Username,
+			Bio:      input.User.Bio,
+			Email:    input.User.Email,
+			Image:    input.User.Image,
+		}
+
+		if v := input.User.Password; v != nil {
+			user.SetPassword(*v)
+		}
+
+		err := s.userService.UpdateUser(ctx, user, patch)
+		if err != nil {
+			logError(err)
+			serverError(w)
+			return
+		}
+
+		token := userTokenFromContext(ctx)
+
+		if err := writeJSON(w, http.StatusOK, M{"user": userResponse(user, token)}); err != nil {
+			logError(err)
+		}
 	}
-
-	claims, ok := token.Claims.(jwt.MapClaims)
-
-	if !ok {
-		return nil, nil
-	}
-
-	return M(claims), nil
 }

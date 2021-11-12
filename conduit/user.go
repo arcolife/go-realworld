@@ -29,6 +29,14 @@ type UserFilter struct {
 	Offset int `json:"offset,omitempty"`
 }
 
+type UserPatch struct {
+	Email        *string `json:"email,omitempty"`
+	Username     *string `json:"username,omitempty"`
+	Image        *string `json:"image,omitempty"`
+	Bio          *string `json:"bio,omitempty"`
+	PasswordHash *string `json:"-" db:"password_hash"`
+}
+
 func (u *User) SetPassword(password string) error {
 	hashBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 
@@ -53,13 +61,17 @@ func (u *User) IsAnonymous() bool {
 }
 
 type UserService interface {
+	Authenticate(ctx context.Context, email, password string) (*User, error)
+
 	CreateUser(context.Context, *User) error
 
-	//UserByID(context.Context, uint) (*User, error)
+	UserByID(context.Context, uint) (*User, error)
 
 	UserByEmail(context.Context, string) (*User, error)
 
-	//Users(context.Context, UserFilter) ([]*User, error)
+	Users(context.Context, UserFilter) ([]*User, error)
 
-	Authenticate(ctx context.Context, email, password string) (*User, error)
+	UpdateUser(context.Context, *User, UserPatch) error
+
+	DeleteUser(context.Context, uint) error
 }

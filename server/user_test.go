@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -11,29 +10,12 @@ import (
 	"testing"
 
 	"github.com/0xdod/go-realworld/conduit"
+	"github.com/0xdod/go-realworld/mock"
 	"github.com/gorilla/mux"
 )
 
-type MockUserService struct {
-	CreateUserFn   func(*conduit.User) error
-	UserByEmailFn  func(string) *conduit.User
-	AuthenticateFn func() *conduit.User
-}
-
-func (m *MockUserService) CreateUser(_ context.Context, user *conduit.User) error {
-	return m.CreateUserFn(user)
-}
-
-func (m *MockUserService) UserByEmail(_ context.Context, email string) (*conduit.User, error) {
-	return m.UserByEmailFn(email), nil
-}
-
-func (m *MockUserService) Authenticate(_ context.Context, email, password string) (*conduit.User, error) {
-	return m.AuthenticateFn(), nil
-}
-
 func Test_createUser(t *testing.T) {
-	userStore := &MockUserService{}
+	userStore := &mock.UserService{}
 	srv := testServer()
 	srv.userService = userStore
 
@@ -69,7 +51,7 @@ func Test_createUser(t *testing.T) {
 }
 
 func Test_loginUser(t *testing.T) {
-	userStore := &MockUserService{}
+	userStore := &mock.UserService{}
 	srv := testServer()
 	srv.userService = userStore
 

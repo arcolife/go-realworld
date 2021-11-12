@@ -34,18 +34,8 @@ func (us *UserService) CreateUser(ctx context.Context, user *conduit.User) error
 	return tx.Commit()
 }
 
-func (us *UserService) Authenticate(ctx context.Context, email, password string) (*conduit.User, error) {
-	user, err := us.UserByEmail(ctx, email)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if !user.VerifyPassword(password) {
-		return nil, conduit.ErrUnAuthorized
-	}
-
-	return user, nil
+func (us *UserService) UserByID(ctx context.Context, id uint) (*conduit.User, error) {
+	return nil, nil
 }
 
 func (us *UserService) UserByEmail(ctx context.Context, email string) (*conduit.User, error) {
@@ -74,8 +64,45 @@ func (us *UserService) Users(ctx context.Context, uf conduit.UserFilter) ([]*con
 	return nil, nil
 }
 
-func (us *UserService) UserByID(ctx context.Context, id uint) (*conduit.User, error) {
-	return nil, nil
+func (us *UserService) Authenticate(ctx context.Context, email, password string) (*conduit.User, error) {
+	user, err := us.UserByEmail(ctx, email)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if !user.VerifyPassword(password) {
+		return nil, conduit.ErrUnAuthorized
+	}
+
+	return user, nil
+}
+
+func (us *UserService) UpdateUser(ctx context.Context, user *conduit.User, patch conduit.UserPatch) error {
+	tx, err := us.db.BeginTxx(ctx, nil)
+
+	if err != nil {
+		log.Println(err)
+		return conduit.ErrInternal
+	}
+
+	defer tx.Rollback()
+
+	if err := updateUser(ctx, tx, user, patch); err != nil {
+		log.Println(err)
+		return conduit.ErrInternal
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Println(err)
+		return conduit.ErrInternal
+	}
+
+	return nil
+}
+
+func (us *UserService) DeleteUser(ctx context.Context, id uint) error {
+	return nil
 }
 
 func createUser(ctx context.Context, tx *sqlx.Tx, user *conduit.User) error {
@@ -98,9 +125,9 @@ func createUser(ctx context.Context, tx *sqlx.Tx, user *conduit.User) error {
 		}
 	}
 
-	query = `UPDATE users SET updated_at = $1 where id = $2`
+	query = `UPDATE users SET updated_at = $1 WHERE id = $2`
 
-	err = tx.QueryRowxContext(ctx, query, user.CreatedAt, user.ID).Err()
+	_, err = tx.ExecContext(ctx, query, user.CreatedAt, user.ID)
 
 	if err != nil {
 		return err
@@ -123,9 +150,19 @@ func FormatLimitOffset(limit, offset int) string {
 }
 
 // findUserByEmail is a helper function to fetch a user by email.
-// Returns ENOTFOUND if user does not exist.
 func findUserByEmail(ctx context.Context, tx *sqlx.Tx, email string) (*conduit.User, error) {
 	us, err := findUsers(ctx, tx, conduit.UserFilter{Email: &email})
+
+	if err != nil {
+		return nil, err
+	} else if len(us) == 0 {
+		return nil, conduit.ErrNotFound
+	}
+	return us[0], nil
+}
+
+func findUserByID(ctx context.Context, tx *sqlx.Tx, id uint) (*conduit.User, error) {
+	us, err := findUsers(ctx, tx, conduit.UserFilter{ID: &id})
 
 	if err != nil {
 		return nil, err
@@ -186,5 +223,48 @@ func findUsers(ctx context.Context, tx *sqlx.Tx, filter conduit.UserFilter) ([]*
 		return nil, err
 	}
 	return users, nil
+}
 
+func updateUser(ctx context.Context, tx *sqlx.Tx, user *conduit.User, patch conduit.UserPatch) error {
+	if v := patch.Bio; v != nil {
+		user.Bio = *v
+	}
+
+	if v := patch.Email; v != nil {
+		user.Email = *v
+	}
+
+	if v := patch.PasswordHash; v != nil {
+		user.PasswordHash = *v
+	}
+
+	if v := patch.Image; v != nil {
+		user.Image = *v
+	}
+
+	if v := patch.Username; v != nil {
+		user.Image = *v
+	}
+
+	args := []interface{}{
+		user.Username,
+		user.Email,
+		user.Bio,
+		user.Image,
+		user.PasswordHash,
+		user.ID,
+	}
+
+	query := `
+	UPDATE users 
+	SET username = $1, email = $2, bio = $3, image = $4, password_hash = $5, updated_at = NOW()
+	WHERE id = $6
+	RETURNING updated_at`
+
+	if err := tx.QueryRowxContext(ctx, query, args...).Scan(&user.UpdatedAt); err != nil {
+		log.Printf("error updating record: %v", err)
+		return conduit.ErrInternal
+	}
+
+	return nil
 }

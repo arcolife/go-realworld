@@ -12,15 +12,16 @@ func (s *Server) routes() {
 
 	{
 		apiRouter.Handle("/health", healthCheck())
-		apiRouter.Handle("/users", s.createUser())
-		apiRouter.Handle("/users/login", s.loginUser())
+		apiRouter.Handle("/users", s.createUser()).Methods("POST")
+		apiRouter.Handle("/users/login", s.loginUser()).Methods("POST")
 	}
 
 	authApiRoutes := apiRouter.PathPrefix("").Subrouter()
 	authApiRoutes.Use(s.authenticate(MustAuth))
 
 	{
-		authApiRoutes.Handle("/user", s.getCurrentUser())
+		authApiRoutes.Handle("/user", s.getCurrentUser()).Methods("GET")
+		authApiRoutes.Handle("/user", s.updateUser()).Methods("PUT", "PATCH")
 
 	}
 }

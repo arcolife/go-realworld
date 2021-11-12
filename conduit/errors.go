@@ -2,7 +2,10 @@ package conduit
 
 import "errors"
 
-var ErrDuplicateEmail = errors.New("duplicate email")
-var ErrDuplicateUsername = errors.New("duplicate username")
-var ErrNotFound = errors.New("record not found")
-var ErrUnAuthorized = errors.New("unauthorized")
+var (
+	ErrDuplicateEmail    = errors.New("duplicate email")
+	ErrDuplicateUsername = errors.New("duplicate username")
+	ErrNotFound          = errors.New("record not found")
+	ErrUnAuthorized      = errors.New("unauthorized")
+	ErrInternal          = errors.New("internal error")
+)
