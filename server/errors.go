@@ -34,6 +34,12 @@ func invalidUserCredentialsError(w http.ResponseWriter) {
 	writeJSON(w, http.StatusUnauthorized, M{"errors": msg})
 }
 
+func invalidAuthTokenError(w http.ResponseWriter) {
+	w.Header().Set("WWW-Authenticate", "Token")
+	msg := "invalid or missing authentication token"
+	writeJSON(w, http.StatusUnauthorized, M{"errors": msg})
+}
+
 func serverError(w http.ResponseWriter) {
 	writeJSON(w, http.StatusInternalServerError, M{"error": "internal error"})
 }

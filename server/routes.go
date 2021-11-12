@@ -1,18 +1,10 @@
 package server
 
 import (
-	"io"
-	"net/http"
 	"os"
-
-	"github.com/gorilla/handlers"
 )
 
-func Logger(w io.Writer) func(h http.Handler) http.Handler {
-	return (func(h http.Handler) http.Handler {
-		return handlers.LoggingHandler(w, h)
-	})
-}
+const MustAuth = true
 
 func (s *Server) routes() {
 	s.router.Use(Logger(os.Stdout))
@@ -22,5 +14,13 @@ func (s *Server) routes() {
 		apiRouter.Handle("/health", healthCheck())
 		apiRouter.Handle("/users", s.createUser())
 		apiRouter.Handle("/users/login", s.loginUser())
+	}
+
+	authApiRoutes := apiRouter.PathPrefix("").Subrouter()
+	authApiRoutes.Use(s.authenticate(MustAuth))
+
+	{
+		authApiRoutes.Handle("/user", s.getCurrentUser())
+
 	}
 }

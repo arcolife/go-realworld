@@ -18,6 +18,8 @@ type User struct {
 	UpdatedAt    time.Time `json:"updatedAt,omitempty" db:"updated_at"`
 }
 
+var AnonymousUser User
+
 type UserFilter struct {
 	ID       *uint   `json:"id,omitempty"`
 	Email    *string `json:"email,omitempty"`
@@ -44,6 +46,10 @@ func (u User) VerifyPassword(password string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password))
 
 	return err == nil
+}
+
+func (u *User) IsAnonymous() bool {
+	return u == &AnonymousUser
 }
 
 type UserService interface {

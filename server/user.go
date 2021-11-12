@@ -25,6 +25,10 @@ func init() {
 }
 
 func userResponse(_user *conduit.User, _token ...string) M {
+	if _user.IsAnonymous() {
+		return nil
+	}
+
 	var token string
 	if len(_token) > 0 {
 		token = _token[0]
@@ -130,11 +134,26 @@ func (s *Server) loginUser() http.HandlerFunc {
 	}
 }
 
+func (s *Server) getCurrentUser() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		user := userFromContext(ctx)
+		token := userTokenFromContext(ctx)
+		err := writeJSON(w, http.StatusOK, M{"user": userResponse(user, token)})
+
+		if err != nil {
+			logError(err)
+		}
+
+	}
+}
+
 var hmacSampleSecret = []byte("sample-secret")
 
 func generateUserToken(user *conduit.User) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id": user.ID,
+		"id":    user.ID,
+		"email": user.Email,
 	})
 
 	tokenString, err := token.SignedString(hmacSampleSecret)
@@ -144,4 +163,26 @@ func generateUserToken(user *conduit.User) (string, error) {
 	}
 
 	return tokenString, nil
+}
+
+func parseUserToken(tokenStr string) (userClaims M, err error) {
+	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, conduit.ErrUnAuthorized
+		}
+
+		return hmacSampleSecret, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+
+	if !ok {
+		return nil, nil
+	}
+
+	return M(claims), nil
 }
