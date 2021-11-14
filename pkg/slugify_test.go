@@ -6,7 +6,7 @@ import (
 	"github.com/0xdod/go-realworld/pkg"
 )
 
-func TestSlug(t *testing.T) {
+func TestSlugify(t *testing.T) {
 	cases := []struct {
 		Name     string
 		Input    string

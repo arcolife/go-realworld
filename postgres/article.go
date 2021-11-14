@@ -112,12 +112,12 @@ func findArticles(ctx context.Context, tx *sqlx.Tx, filter conduit.ArticleFilter
 
 	if v := filter.ID; v != nil {
 		argPosition++
-		where, args = append(where, fmt.Sprintf("author_id = $%d", argPosition)), append(args, *v)
+		where, args = append(where, fmt.Sprintf("id = $%d", argPosition)), append(args, *v)
 	}
 
 	if v := filter.AuthorID; v != nil {
 		argPosition++
-		where, args = append(where, fmt.Sprintf("id = $%d", argPosition)), append(args, *v)
+		where, args = append(where, fmt.Sprintf("author_id = $%d", argPosition)), append(args, *v)
 	}
 
 	if v := filter.Slug; v != nil {
@@ -128,6 +128,23 @@ func findArticles(ctx context.Context, tx *sqlx.Tx, filter conduit.ArticleFilter
 	if v := filter.Title; v != nil {
 		argPosition++
 		where, args = append(where, fmt.Sprintf("title = $%d", argPosition)), append(args, *v)
+	}
+
+	if v := filter.Tag; v != nil {
+		argPosition++
+		clause := `
+		id IN (select article_id from article_tags where tag_id in (
+			   select id from tags where name = $%d
+			   )
+		    )
+		`
+		where, args = append(where, fmt.Sprintf(clause, argPosition)), append(args, *v)
+	}
+
+	if v := filter.AuthorUsername; v != nil {
+		argPosition++
+		clause := "author_id = (select id from users where username = $%d)"
+		where, args = append(where, fmt.Sprintf(clause, argPosition)), append(args, *v)
 	}
 
 	whereClause := ""
@@ -193,6 +210,10 @@ func setArticleTags(ctx context.Context, tx *sqlx.Tx, article *conduit.Article, 
 
 	return nil
 }
+
+/*
+SELECT * from articles where author_id = (select id from users where username = new_user)"
+*/
 
 func associateArticleWithTag(ctx context.Context, tx *sqlx.Tx, article *conduit.Article, tag *conduit.Tag) error {
 	query := "INSERT INTO article_tags (article_id, tag_id) VALUES ($1, $2)"

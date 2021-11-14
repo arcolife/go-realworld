@@ -52,11 +52,13 @@ func (a Article) MarshalJSON() ([]byte, error) {
 }
 
 type ArticleFilter struct {
-	ID          *uint
-	Title       *string
-	Description *string
-	AuthorID    *uint
-	Slug        *string
+	ID             *uint
+	Title          *string
+	Description    *string
+	AuthorID       *uint
+	AuthorUsername *string
+	Tag            *string
+	Slug           *string
 }
 
 type ArticlePatch struct {
