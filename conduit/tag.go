@@ -6,8 +6,8 @@ import (
 )
 
 type Tag struct {
-	ID   uint   `json:"id,omitempty"`
-	Name string `json:"name,omitempty"`
+	ID   uint   `json:"-"`
+	Name string `json:"name"`
 }
 
 func (t Tag) MarshalJSON() ([]byte, error) {

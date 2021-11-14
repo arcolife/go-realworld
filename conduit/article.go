@@ -7,18 +7,18 @@ import (
 )
 
 type Article struct {
-	ID             uint      `json:"id"`
+	ID             uint      `json:"-"`
 	Title          string    `json:"title"`
 	Body           string    `json:"body"`
 	Description    string    `json:"description"`
-	AuthorID       uint      `json:"-"`
+	AuthorID       uint      `json:"-" db:"author_id"`
 	Author         *User     `json:"author"`
 	Favorited      bool      `json:"favorited"`
-	FavoritesCount uint      `json:"favoritesCount"`
+	FavoritesCount uint      `json:"favoritesCount" db:"favorites_count"`
 	Slug           string    `json:"slug"`
 	Tags           []*Tag    `json:"tagList"`
-	CreatedAt      time.Time `json:"createdAt"`
-	UpdatedAt      time.Time `json:"updatedAt"`
+	CreatedAt      time.Time `json:"createdAt" db:"created_at"`
+	UpdatedAt      time.Time `json:"updatedAt" db:"updated_at"`
 }
 
 func (a Article) MarshalJSON() ([]byte, error) {

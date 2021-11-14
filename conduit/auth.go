@@ -1,6 +1,6 @@
 package conduit
 
-// TODO: roll-out stateful auth tokens as with the JWT, it's quite tricky to revoke tokens
+// TODO: roll-out stateful auth tokens, as with the JWTs it's quite tricky to revoke tokens
 
 // import (
 // 	"context"

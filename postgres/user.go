@@ -165,7 +165,6 @@ func findUserByID(ctx context.Context, tx *sqlx.Tx, id uint) (*conduit.User, err
 }
 
 func findUsers(ctx context.Context, tx *sqlx.Tx, filter conduit.UserFilter) ([]*conduit.User, error) {
-	// Build WHERE clause.
 	where, args := []string{}, []interface{}{}
 	argPosition := 0
 

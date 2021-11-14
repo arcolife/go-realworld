@@ -53,3 +53,17 @@ func (s *Server) createArticle() http.HandlerFunc {
 		writeJSON(w, http.StatusOK, M{"article": article})
 	}
 }
+
+func (s *Server) listArticles() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+
+		articles, err := s.articleService.Articles(r.Context(), conduit.ArticleFilter{})
+
+		if err != nil {
+			serverError(w, err)
+			return
+		}
+
+		writeJSON(w, http.StatusOK, M{"articles": articles})
+	}
+}
