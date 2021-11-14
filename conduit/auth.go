@@ -1,47 +1,49 @@
 package conduit
 
-import (
-	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/base32"
-	"time"
-)
+// TODO: roll-out stateful auth tokens as with the JWT, it's quite tricky to revoke tokens
 
-const (
-	ScopeAuthorization = "authorization"
-)
+// import (
+// 	"context"
+// 	"crypto/rand"
+// 	"crypto/sha256"
+// 	"encoding/base32"
+// 	"time"
+// )
 
-type Token struct {
-	ID        uint
-	PlainText string
-	UserID    uint
-	Hash      string
-	Expiry    time.Time
-	Scope     string
-}
+// const (
+// 	ScopeAuthorization = "authorization"
+// )
 
-func generateToken(userID uint, ttl time.Duration, scope string) (*Token, error) {
-	token := &Token{
-		UserID: userID,
-		Expiry: time.Now().Add(ttl),
-		Scope:  scope,
-	}
+// type Token struct {
+// 	ID        uint
+// 	PlainText string
+// 	UserID    uint
+// 	Hash      string
+// 	Expiry    time.Time
+// 	Scope     string
+// }
 
-	randomBytes := make([]byte, 16)
+// func generateToken(userID uint, ttl time.Duration, scope string) (*Token, error) {
+// 	token := &Token{
+// 		UserID: userID,
+// 		Expiry: time.Now().Add(ttl),
+// 		Scope:  scope,
+// 	}
 
-	_, err := rand.Read(randomBytes)
-	if err != nil {
-		return nil, err
-	}
+// 	randomBytes := make([]byte, 16)
 
-	token.PlainText = base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(randomBytes)
-	hash := sha256.Sum256([]byte(token.PlainText))
-	token.Hash = string(hash[:])
-	return token, nil
-}
+// 	_, err := rand.Read(randomBytes)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-type TokenService interface {
-	CreateToken(context.Context, *Token) error
-	DeleteToken(ctx context.Context, userID uint, scope string) error
-}
+// 	token.PlainText = base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(randomBytes)
+// 	hash := sha256.Sum256([]byte(token.PlainText))
+// 	token.Hash = string(hash[:])
+// 	return token, nil
+// }
+
+// type TokenService interface {
+// 	CreateToken(context.Context, *Token) error
+// 	DeleteToken(ctx context.Context, userID uint, scope string) error
+// }

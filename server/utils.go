@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 
 	"github.com/0xdod/go-realworld/conduit"
@@ -12,10 +13,21 @@ import (
 // M is a generic map
 type M map[string]interface{}
 
-func writeJSON(w http.ResponseWriter, code int, data interface{}) error {
+func writeJSON(w http.ResponseWriter, code int, data interface{}) {
+	jsonBytes, err := json.Marshal(data)
+
+	if err != nil {
+		serverError(w, err)
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	return json.NewEncoder(w).Encode(data)
+	_, err = w.Write(jsonBytes)
+
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 func readJSON(body io.Reader, input interface{}) error {

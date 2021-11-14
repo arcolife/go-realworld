@@ -45,7 +45,7 @@ func (s *Server) authenticate(mustAuth bool) func(http.Handler) http.Handler {
 			claims, err := parseUserToken(token)
 
 			if err != nil {
-				serverError(w)
+				serverError(w, err)
 				return
 			}
 
@@ -54,7 +54,7 @@ func (s *Server) authenticate(mustAuth bool) func(http.Handler) http.Handler {
 			user, err := s.userService.UserByEmail(r.Context(), email)
 
 			if err != nil {
-				serverError(w)
+				serverError(w, err)
 				return
 			}
 

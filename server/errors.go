@@ -8,14 +8,17 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
+// ErrorM is used to create the validation error response format according to the API spec
 type ErrorM map[string][]string
 
+// Error is needed to implement the error interface
 func (e ErrorM) Error() string {
-	return ""
+	return "validation error"
 }
 
 func validationError(w http.ResponseWriter, _err error) {
 	resp := ErrorM{}
+
 	switch err := _err.(type) {
 	case validator.ValidationErrors:
 		for _, e := range err {
@@ -29,23 +32,28 @@ func validationError(w http.ResponseWriter, _err error) {
 	errorResponse(w, http.StatusUnprocessableEntity, resp)
 }
 
+func badRequestError(w http.ResponseWriter) {
+	errorResponse(w, http.StatusUnprocessableEntity, "unable to process request")
+}
+
 func invalidUserCredentialsError(w http.ResponseWriter) {
 	msg := "invalid authentication credentials"
-	writeJSON(w, http.StatusUnauthorized, M{"errors": msg})
+	errorResponse(w, http.StatusUnauthorized, msg)
 }
 
 func invalidAuthTokenError(w http.ResponseWriter) {
 	w.Header().Set("WWW-Authenticate", "Token")
 	msg := "invalid or missing authentication token"
-	writeJSON(w, http.StatusUnauthorized, M{"errors": msg})
+	errorResponse(w, http.StatusUnauthorized, msg)
 }
 
-func serverError(w http.ResponseWriter) {
-	writeJSON(w, http.StatusInternalServerError, M{"error": "internal error"})
+func serverError(w http.ResponseWriter, err error) {
+	log.Println(err)
+	errorResponse(w, http.StatusInternalServerError, "internal error")
 }
 
-func errorResponse(w http.ResponseWriter, code int, err error) {
-	writeJSON(w, code, M{"errors": err})
+func errorResponse(w http.ResponseWriter, code int, errs interface{}) {
+	writeJSON(w, code, M{"errors": errs})
 }
 
 func checkTagRules(e validator.FieldError) (errMsg string) {
@@ -67,8 +75,4 @@ func checkTagRules(e validator.FieldError) (errMsg string) {
 		errMsg = fmt.Sprintf("%s must be less than %v", field, param)
 	}
 	return
-}
-
-func logError(err error) {
-	log.Println(err)
 }

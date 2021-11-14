@@ -23,8 +23,10 @@ func init() {
 	})
 }
 
-func userResponse(_user *conduit.User, _token ...string) M {
-	if _user == nil {
+// userResponse is a helper function used to return the User response in the format specified
+// by the API spec.
+func userResponse(user *conduit.User, _token ...string) M {
+	if user == nil {
 		return nil
 	}
 	var token string
@@ -32,16 +34,15 @@ func userResponse(_user *conduit.User, _token ...string) M {
 		token = _token[0]
 	}
 	return M{
-		"email":    _user.Email,
+		"email":    user.Email,
 		"token":    token,
-		"username": _user.Username,
-		"bio":      _user.Bio,
-		"image":    _user.Image,
+		"username": user.Username,
+		"bio":      user.Bio,
+		"image":    user.Image,
 	}
 }
 
 func (s *Server) createUser() http.HandlerFunc {
-
 	type Input struct {
 		User struct {
 			Email    string `json:"email" validate:"required,email"`
@@ -67,6 +68,7 @@ func (s *Server) createUser() http.HandlerFunc {
 			Email:    input.User.Email,
 			Username: input.User.Username,
 		}
+
 		user.SetPassword(input.User.Password)
 
 		if err := s.userService.CreateUser(r.Context(), &user); err != nil {
@@ -78,36 +80,28 @@ func (s *Server) createUser() http.HandlerFunc {
 				err = ErrorM{"username": []string{"this username is already in use"}}
 				errorResponse(w, http.StatusConflict, err)
 			default:
-				serverError(w)
+				serverError(w, err)
 			}
-			logError(err)
 			return
 		}
 
-		if err := writeJSON(w, http.StatusCreated, M{"user": userResponse(&user)}); err != nil {
-			logError(err)
-		}
+		writeJSON(w, http.StatusCreated, M{"user": user})
 	}
 }
 
 func (s *Server) loginUser() http.HandlerFunc {
 	type Input struct {
 		User struct {
-			Email    string `json:"email" validate:"required,email"`
-			Password string `json:"password" validate:"required,min=8,max=72"`
-		} `json:"user" validate:"required"`
+			Email    string `json:"email"`
+			Password string `json:"password"`
+		} `json:"user"`
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		input := &Input{}
+		input := Input{}
 
 		if err := readJSON(r.Body, &input); err != nil {
 			errorResponse(w, http.StatusUnprocessableEntity, err)
-			return
-		}
-
-		if err := validate.Struct(input.User); err != nil {
-			validationError(w, err)
 			return
 		}
 
@@ -121,14 +115,14 @@ func (s *Server) loginUser() http.HandlerFunc {
 		token, err := generateUserToken(user)
 
 		if err != nil {
-			logError(err)
-			serverError(w)
+			serverError(w, err)
 			return
 		}
 
-		if err := writeJSON(w, http.StatusOK, M{"user": userResponse(user, token)}); err != nil {
-			logError(err)
-		}
+		user.Token = token
+
+		writeJSON(w, http.StatusOK, M{"user": user})
+
 	}
 }
 
@@ -136,13 +130,9 @@ func (s *Server) getCurrentUser() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		user := userFromContext(ctx)
-		token := userTokenFromContext(ctx)
-		err := writeJSON(w, http.StatusOK, M{"user": userResponse(user, token)})
+		user.Token = userTokenFromContext(ctx)
 
-		if err != nil {
-			logError(err)
-		}
-
+		writeJSON(w, http.StatusOK, M{"user": user})
 	}
 }
 
@@ -160,7 +150,7 @@ func (s *Server) updateUser() http.HandlerFunc {
 		input := &Input{}
 
 		if err := readJSON(r.Body, &input); err != nil {
-			errorResponse(w, http.StatusUnprocessableEntity, err)
+			badRequestError(w)
 			return
 		}
 
@@ -184,15 +174,12 @@ func (s *Server) updateUser() http.HandlerFunc {
 
 		err := s.userService.UpdateUser(ctx, user, patch)
 		if err != nil {
-			logError(err)
-			serverError(w)
+			serverError(w, err)
 			return
 		}
 
-		token := userTokenFromContext(ctx)
+		user.Token = userTokenFromContext(ctx)
 
-		if err := writeJSON(w, http.StatusOK, M{"user": userResponse(user, token)}); err != nil {
-			logError(err)
-		}
+		writeJSON(w, http.StatusOK, M{"user": user})
 	}
 }

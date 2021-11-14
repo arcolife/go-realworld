@@ -109,10 +109,10 @@ func createUser(ctx context.Context, tx *sqlx.Tx, user *conduit.User) error {
 	// Execute insertion query.
 	query := `
 	INSERT INTO users (email, username, bio, image, password_hash)
-	VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at
+	VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at, updated_at
 	`
 	args := []interface{}{user.Email, user.Username, user.Bio, user.Image, user.PasswordHash}
-	err := tx.QueryRowxContext(ctx, query, args...).Scan(&user.ID, &user.CreatedAt)
+	err := tx.QueryRowxContext(ctx, query, args...).Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
 		switch {
@@ -123,14 +123,6 @@ func createUser(ctx context.Context, tx *sqlx.Tx, user *conduit.User) error {
 		default:
 			return err
 		}
-	}
-
-	query = `UPDATE users SET updated_at = $1 WHERE id = $2`
-
-	_, err = tx.ExecContext(ctx, query, user.CreatedAt, user.ID)
-
-	if err != nil {
-		return err
 	}
 
 	return nil

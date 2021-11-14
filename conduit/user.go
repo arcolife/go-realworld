@@ -8,14 +8,15 @@ import (
 )
 
 type User struct {
-	ID           uint      `json:"id,omitempty"`
-	Email        string    `json:"email,omitempty"`
-	Username     string    `json:"username,omitempty"`
-	Bio          string    `json:"bio,omitempty"`
-	Image        string    `json:"image,omitempty"`
+	ID           uint      `json:"-"`
+	Email        string    `json:"email"`
+	Username     string    `json:"username"`
+	Bio          string    `json:"bio"`
+	Image        string    `json:"image"`
+	Token        string    `json:"token"`
 	PasswordHash string    `json:"-" db:"password_hash"`
-	CreatedAt    time.Time `json:"createdAt,omitempty" db:"created_at"`
-	UpdatedAt    time.Time `json:"updatedAt,omitempty" db:"updated_at"`
+	CreatedAt    time.Time `json:"-" db:"created_at"`
+	UpdatedAt    time.Time `json:"-" db:"updated_at"`
 }
 
 var AnonymousUser User
