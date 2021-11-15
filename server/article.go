@@ -104,3 +104,9 @@ func (s *Server) getArticle() http.HandlerFunc {
 		writeJSON(w, http.StatusOK, M{"article": article})
 	}
 }
+
+func (s *Server) listTags() http.HandlerFunc {
+	return func (w http.ResponseWriter, r *http.Request) {
+		
+	}
+}

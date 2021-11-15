@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 
 	"github.com/0xdod/go-realworld/conduit"
 	"github.com/jmoiron/sqlx"
@@ -131,12 +130,9 @@ func findArticles(ctx context.Context, tx *sqlx.Tx, filter conduit.ArticleFilter
 
 	if v := filter.Tag; v != nil {
 		argPosition++
-		clause := `
-		id IN (select article_id from article_tags where tag_id in (
-			   select id from tags where name = $%d
-			   )
-		    )
-		`
+		clause := `id IN (select article_id from article_tags where tag_id in (
+			   select id from tags where name = $%d)
+		    )`
 		where, args = append(where, fmt.Sprintf(clause, argPosition)), append(args, *v)
 	}
 
@@ -147,32 +143,10 @@ func findArticles(ctx context.Context, tx *sqlx.Tx, filter conduit.ArticleFilter
 	}
 
 	query := "SELECT * from articles" + formatWhereClause(where) + " ORDER BY id ASC"
-
-	rows, err := tx.QueryxContext(ctx, query, args...)
-
-	if err != nil {
-		log.Println(err)
-		return nil, err
-	}
-
-	defer rows.Close()
-
 	articles := make([]*conduit.Article, 0)
-
-	for rows.Next() {
-		var article conduit.Article
-
-		if err := rows.StructScan(&article); err != nil {
-			return nil, fmt.Errorf("error retrieving articles: %w", err)
-		}
-
-		articles = append(articles, &article)
+	if err := findMany(ctx, tx, &articles, query, args...); err != nil {
+		return articles, err
 	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error parsing articles: %w", err)
-	}
-
 	return articles, nil
 }
 
@@ -189,7 +163,6 @@ func setArticleTags(ctx context.Context, tx *sqlx.Tx, article *conduit.Article, 
 					return err
 				}
 			default:
-				log.Println(err)
 				return err
 			}
 		}
@@ -203,10 +176,6 @@ func setArticleTags(ctx context.Context, tx *sqlx.Tx, article *conduit.Article, 
 
 	return nil
 }
-
-/*
-SELECT * from articles where author_id = (select id from users where username = new_user)"
-*/
 
 func associateArticleWithTag(ctx context.Context, tx *sqlx.Tx, article *conduit.Article, tag *conduit.Tag) error {
 	query := "INSERT INTO article_tags (article_id, tag_id) VALUES ($1, $2)"
@@ -246,31 +215,9 @@ func findArticleTags(ctx context.Context, tx *sqlx.Tx, article *conduit.Article)
 		SELECT tag_id FROM article_tags WHERE article_id = $1
 	)
 	`
-
-	rows, err := tx.QueryxContext(ctx, query, article.ID)
-
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
 	tags := make([]*conduit.Tag, 0)
-
-	for rows.Next() {
-		var tag conduit.Tag
-
-		if err := rows.StructScan(&tag); err != nil {
-			log.Println(err)
-			return nil, err
-		}
-
-		tags = append(tags, &tag)
+	if err := findMany(ctx, tx, &tags, query, article.ID); err != nil {
+		return tags, err
 	}
-
-	if err := rows.Err(); err != nil {
-		log.Println(err)
-		return nil, err
-	}
-
 	return tags, nil
 }

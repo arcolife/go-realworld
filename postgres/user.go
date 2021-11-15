@@ -34,7 +34,25 @@ func (us *UserService) CreateUser(ctx context.Context, user *conduit.User) error
 }
 
 func (us *UserService) UserByID(ctx context.Context, id uint) (*conduit.User, error) {
-	return nil, nil
+	tx, err := us.db.BeginTxx(ctx, nil)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer tx.Rollback()
+
+	user, err := findOneUser(ctx, tx, conduit.UserFilter{ID: &id})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return user, nil
 }
 
 func (us *UserService) UserByEmail(ctx context.Context, email string) (*conduit.User, error) {
@@ -46,7 +64,7 @@ func (us *UserService) UserByEmail(ctx context.Context, email string) (*conduit.
 
 	defer tx.Rollback()
 
-	user, err := findUserByEmail(ctx, tx, email)
+	user, err := findOneUser(ctx, tx, conduit.UserFilter{Email: &email})
 
 	if err != nil {
 		return nil, err
@@ -68,7 +86,7 @@ func (us *UserService) UserByUsername(ctx context.Context, uname string) (*condu
 
 	defer tx.Rollback()
 
-	user, err := findUserByUsername(ctx, tx, uname)
+	user, err := findOneUser(ctx, tx, conduit.UserFilter{Username: &uname})
 
 	if err != nil {
 		return nil, err
@@ -196,14 +214,6 @@ func createUser(ctx context.Context, tx *sqlx.Tx, user *conduit.User) error {
 	return nil
 }
 
-func findUserByEmail(ctx context.Context, tx *sqlx.Tx, email string) (*conduit.User, error) {
-	return findOneUser(ctx, tx, conduit.UserFilter{Email: &email})
-}
-
-func findUserByUsername(ctx context.Context, tx *sqlx.Tx, uname string) (*conduit.User, error) {
-	return findOneUser(ctx, tx, conduit.UserFilter{Username: &uname})
-}
-
 func findUserByID(ctx context.Context, tx *sqlx.Tx, id uint) (*conduit.User, error) {
 	return findOneUser(ctx, tx, conduit.UserFilter{ID: &id})
 }
@@ -318,28 +328,10 @@ func getFollowers(ctx context.Context, tx *sqlx.Tx, user *conduit.User) ([]*cond
 }
 
 func queryUsers(ctx context.Context, tx *sqlx.Tx, query string, args ...interface{}) ([]*conduit.User, error) {
-	rows, err := tx.QueryxContext(ctx, query, args...)
-
-	if err != nil {
-		return nil, err
-	}
-
-	defer rows.Close()
-
 	users := make([]*conduit.User, 0)
 
-	for rows.Next() {
-		var user conduit.User
-
-		if err := rows.StructScan(&user); err != nil {
-			return nil, err
-		}
-
-		users = append(users, &user)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
+	if err := findMany(ctx, tx, &users, query, args...); err != nil {
+		return users, err
 	}
 
 	return users, nil

@@ -1,8 +1,13 @@
 package postgres
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"reflect"
 	"strings"
+
+	"github.com/jmoiron/sqlx"
 )
 
 func formatLimitOffset(limit, offset int) string {
@@ -23,44 +28,50 @@ func formatWhereClause(where []string) string {
 	return " WHERE " + strings.Join(where, " AND ")
 }
 
-// func findMany(ctx context.Context, tx *sqlx.Tx, ss interface{}, query string, args ...interface{}) error {
-// 	rows, err := tx.QueryxContext(ctx, query, args...)
+func findMany(ctx context.Context, tx *sqlx.Tx, ss interface{}, query string, args ...interface{}) error {
+	rows, err := tx.QueryxContext(ctx, query, args...)
 
-// 	if err != nil {
-// 		return err
-// 	}
+	if err != nil {
+		return err
+	}
 
-// 	defer rows.Close()
+	defer rows.Close()
 
-// 	if reflect.TypeOf(ss).Kind() != reflect.Ptr {
-// 		return fmt.Errorf("expecting a pointer to a slice")
-// 	}
+	sPtrVal, err := asSlicePtr(ss) // get the reflect.Value of the pointer to slice
+	if err != nil {
+		return err
+	}
+	sVal := sPtrVal.Elem()                           // get the relfect.Value of the slice pointed to by ss
+	newSlice := reflect.MakeSlice(sVal.Type(), 0, 0) // new slice
 
-// 	if reflect.TypeOf(ss).Elem().Kind() != reflect.Slice {
-// 		return fmt.Errorf("expecting  a pointer to a slice")
+	for rows.Next() {
+		typ := sVal.Type().Elem().Elem() // to get conduit.Article from []*conduit.Article
+		newVal := reflect.New(typ)
+		if err := rows.StructScan(newVal.Interface()); err != nil {
+			return nil
+		}
+		newSlice = reflect.Append(newSlice, newVal)
+	}
 
-// 	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
 
-// 	sPtrVal := reflect.ValueOf(ss) // pointer to slice value
-// 	ssVal := sPtrVal.Elem()        // slice pointed to by ss
-// 	typ := ssVal.Type().Elem()     // type of slice elements
+	sPtrVal.Elem().Set(newSlice)
 
-// 	newSlice := reflect.MakeSlice(ssVal.Type(), 10, 10) // new slice
+	return nil
+}
 
-// 	for rows.Next() {
-// 		newVal := reflect.New(typ)
+func asSlicePtr(v interface{}) (reflect.Value, error) {
+	typ := reflect.TypeOf(v)
 
-// 		if err := rows.StructScan(newVal.Interface()); err != nil {
-// 			return nil
-// 		}
-// 		newSlice = reflect.Append(newSlice, newVal)
-// 	}
+	if typ.Kind() != reflect.Ptr {
+		return reflect.Value{}, errors.New("expecting a pointer to a slice")
+	}
 
-// 	if err := rows.Err(); err != nil {
-// 		return err
-// 	}
+	if typ.Elem().Kind() != reflect.Slice {
+		return reflect.Value{}, errors.New("expecting  a pointer to a slice")
+	}
 
-// 	sPtrVal.Elem().Set(newSlice)
-
-// 	return nil
-// }
+	return reflect.ValueOf(v), nil
+}
