@@ -47,9 +47,8 @@ func invalidAuthTokenError(w http.ResponseWriter) {
 	errorResponse(w, http.StatusUnauthorized, msg)
 }
 
-func notFoundError(w http.ResponseWriter) {
-	msg := "this resource cannot be found on this server"
-	errorResponse(w, http.StatusNotFound, msg)
+func notFoundError(w http.ResponseWriter, err ErrorM) {
+	errorResponse(w, http.StatusNotFound, err)
 }
 
 func serverError(w http.ResponseWriter, err error) {

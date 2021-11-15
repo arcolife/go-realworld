@@ -53,6 +53,9 @@ type ArticleFilter struct {
 	AuthorUsername *string
 	Tag            *string
 	Slug           *string
+
+	Limit  int
+	Offset int
 }
 
 type ArticlePatch struct {

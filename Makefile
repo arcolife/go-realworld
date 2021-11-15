@@ -9,5 +9,8 @@ create-migration:
 run-migration:
 	migrate -database $(POSTGRESQL_URL) -path postgres/migrations $(dir)
 
+down-migration:
+	migrate -database $(POSTGRESQL_URL) -path postgres/migrations down $(v)
+
 force-migration:
 	migrate -database $(POSTGRESQL_URL) -path postgres/migrations force $(version)

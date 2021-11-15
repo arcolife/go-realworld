@@ -59,6 +59,28 @@ func (us *UserService) UserByEmail(ctx context.Context, email string) (*conduit.
 	return user, nil
 }
 
+func (us *UserService) UserByUsername(ctx context.Context, uname string) (*conduit.User, error) {
+	tx, err := us.db.BeginTxx(ctx, nil)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer tx.Rollback()
+
+	user, err := findUserByUsername(ctx, tx, uname)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
 func (us *UserService) Users(ctx context.Context, uf conduit.UserFilter) ([]*conduit.User, error) {
 	tx, err := us.db.BeginTxx(ctx, nil)
 
@@ -74,7 +96,7 @@ func (us *UserService) Users(ctx context.Context, uf conduit.UserFilter) ([]*con
 		return nil, err
 	}
 
-	return users, nil
+	return users, tx.Commit()
 }
 
 func (us *UserService) Authenticate(ctx context.Context, email, password string) (*conduit.User, error) {
@@ -118,6 +140,39 @@ func (us *UserService) DeleteUser(ctx context.Context, id uint) error {
 	return nil
 }
 
+// FollowUser follower -> follows -> user
+func (us *UserService) FollowUser(ctx context.Context, user, follower *conduit.User) error {
+	tx, err := us.db.BeginTxx(ctx, nil)
+
+	if err != nil {
+		return err
+	}
+
+	defer tx.Rollback()
+
+	if err = addFollowing(ctx, tx, user, follower); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (us *UserService) UnFollowUser(ctx context.Context, user, follower *conduit.User) error {
+	tx, err := us.db.BeginTxx(ctx, nil)
+
+	if err != nil {
+		return err
+	}
+
+	defer tx.Rollback()
+
+	if err = removeFollowing(ctx, tx, user, follower); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
 func createUser(ctx context.Context, tx *sqlx.Tx, user *conduit.User) error {
 	// Execute insertion query.
 	query := `
@@ -141,20 +196,20 @@ func createUser(ctx context.Context, tx *sqlx.Tx, user *conduit.User) error {
 	return nil
 }
 
-// findUserByEmail is a helper function to fetch a user by email.
 func findUserByEmail(ctx context.Context, tx *sqlx.Tx, email string) (*conduit.User, error) {
-	us, err := findUsers(ctx, tx, conduit.UserFilter{Email: &email})
+	return findOneUser(ctx, tx, conduit.UserFilter{Email: &email})
+}
 
-	if err != nil {
-		return nil, err
-	} else if len(us) == 0 {
-		return nil, conduit.ErrNotFound
-	}
-	return us[0], nil
+func findUserByUsername(ctx context.Context, tx *sqlx.Tx, uname string) (*conduit.User, error) {
+	return findOneUser(ctx, tx, conduit.UserFilter{Username: &uname})
 }
 
 func findUserByID(ctx context.Context, tx *sqlx.Tx, id uint) (*conduit.User, error) {
-	us, err := findUsers(ctx, tx, conduit.UserFilter{ID: &id})
+	return findOneUser(ctx, tx, conduit.UserFilter{ID: &id})
+}
+
+func findOneUser(ctx context.Context, tx *sqlx.Tx, filter conduit.UserFilter) (*conduit.User, error) {
+	us, err := findUsers(ctx, tx, filter)
 
 	if err != nil {
 		return nil, err
@@ -183,36 +238,20 @@ func findUsers(ctx context.Context, tx *sqlx.Tx, filter conduit.UserFilter) ([]*
 		where, args = append(where, fmt.Sprintf("username = $%d", argPosition)), append(args, *v)
 	}
 
-	// Execute query to fetch user rows.
-	query := "SELECT * from users" + formatWhereClause(where) + " ORDER BY id ASC" +
-		formatLimitOffset(filter.Limit, filter.Offset)
-	rows, err := tx.QueryxContext(ctx, query, args...)
+	query := "SELECT * from users" + formatWhereClause(where) +
+		" ORDER BY id ASC" + formatLimitOffset(filter.Limit, filter.Offset)
+
+	users, err := queryUsers(ctx, tx, query, args...)
 
 	if err != nil {
-		log.Println(err)
 		return nil, err
 	}
 
-	defer rows.Close()
-
-	// Deserialize rows into User objects.
-	users := make([]*conduit.User, 0)
-
-	for rows.Next() {
-		var user conduit.User
-
-		if err := rows.StructScan(&user); err != nil {
-			log.Println(err)
-			return nil, err
-		}
-
-		users = append(users, &user)
+	for _, user := range users {
+		followers, _ := getFollowers(ctx, tx, user)
+		user.Followers = followers
 	}
 
-	if err := rows.Err(); err != nil {
-		log.Println(err)
-		return nil, err
-	}
 	return users, nil
 }
 
@@ -258,4 +297,55 @@ func updateUser(ctx context.Context, tx *sqlx.Tx, user *conduit.User, patch cond
 	}
 
 	return nil
+}
+
+func addFollowing(ctx context.Context, tx *sqlx.Tx, following, follower *conduit.User) error {
+	query := "INSERT INTO followings (following_id, follower_id) VALUES ($1, $2)"
+	return execQuery(ctx, tx, query, following.ID, follower.ID)
+}
+
+func removeFollowing(ctx context.Context, tx *sqlx.Tx, following, follower *conduit.User) error {
+	query := "DELETE FROM followings WHERE following_id = $1 AND follower_id = $2"
+	return execQuery(ctx, tx, query, following.ID, follower.ID)
+}
+
+func getFollowers(ctx context.Context, tx *sqlx.Tx, user *conduit.User) ([]*conduit.User, error) {
+	query := `SELECT * FROM users WHERE id IN (
+		SELECT follower_id FROM followings WHERE following_id = $1
+	)
+	`
+	return queryUsers(ctx, tx, query, user.ID)
+}
+
+func queryUsers(ctx context.Context, tx *sqlx.Tx, query string, args ...interface{}) ([]*conduit.User, error) {
+	rows, err := tx.QueryxContext(ctx, query, args...)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	users := make([]*conduit.User, 0)
+
+	for rows.Next() {
+		var user conduit.User
+
+		if err := rows.StructScan(&user); err != nil {
+			return nil, err
+		}
+
+		users = append(users, &user)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}
+
+func execQuery(ctx context.Context, tx *sqlx.Tx, query string, args ...interface{}) error {
+	_, err := tx.ExecContext(ctx, query, args...)
+	return err
 }

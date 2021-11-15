@@ -39,3 +39,15 @@ func (us *UserService) DeleteUser(ctx context.Context, id uint) error {
 func (us *UserService) Users(ctx context.Context, uf conduit.UserFilter) ([]*conduit.User, error) {
 	return nil, nil
 }
+
+func (m *UserService) FollowUser(_ context.Context, user, follower *conduit.User) error {
+	panic("not implemeted")
+}
+
+func (m *UserService) UnFollowUser(_ context.Context, user, follower *conduit.User) error {
+	panic("not implmented")
+}
+
+func (us *UserService) UserByUsername(ctx context.Context, uname string) (*conduit.User, error) {
+	panic("not implemented")
+}

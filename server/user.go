@@ -2,12 +2,14 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"reflect"
 	"strings"
 
 	"github.com/0xdod/go-realworld/conduit"
 	"github.com/go-playground/validator/v10"
+	"github.com/gorilla/mux"
 )
 
 var validate *validator.Validate
@@ -181,5 +183,74 @@ func (s *Server) updateUser() http.HandlerFunc {
 		user.Token = userTokenFromContext(ctx)
 
 		writeJSON(w, http.StatusOK, M{"user": user})
+	}
+}
+
+func (s *Server) getProfile() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		ctx := r.Context()
+		user, err := s.userService.UserByUsername(ctx, vars["username"])
+
+		if err != nil {
+			switch {
+			case errors.Is(err, conduit.ErrNotFound):
+				err := ErrorM{"profile": []string{"user profile not found"}}
+				notFoundError(w, err)
+			default:
+				serverError(w, err)
+			}
+
+			return
+		}
+
+		currentUser := userFromContext(ctx)
+		profile := user.ProfileWithFollow(currentUser)
+		writeJSON(w, http.StatusOK, M{"profile": profile})
+	}
+}
+
+func (s *Server) followAction(action string) http.HandlerFunc {
+	const (
+		Follow   = "follow"
+		UnFollow = "unfollow"
+	)
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		currentUser := userFromContext(ctx)
+		username := mux.Vars(r)["username"]
+		user, err := s.userService.UserByUsername(ctx, username)
+
+		if user.ID == currentUser.ID {
+			err := ErrorM{"profile": []string{fmt.Sprintf("cannot %s self", action)}}
+			errorResponse(w, http.StatusForbidden, err)
+			return
+		}
+
+		if err != nil {
+			err := ErrorM{"profile": []string{"user profile not found"}}
+			notFoundError(w, err)
+			return
+		}
+
+		var following bool
+		switch action {
+		case Follow:
+			err = s.userService.FollowUser(r.Context(), user, currentUser)
+			following = true
+		case UnFollow:
+			err = s.userService.UnFollowUser(r.Context(), user, currentUser)
+			following = false
+		}
+
+		if err != nil {
+			serverError(w, err)
+			return
+		}
+
+		profile := user.Profile()
+		profile.Following = following
+
+		writeJSON(w, http.StatusOK, M{"profile": profile})
 	}
 }

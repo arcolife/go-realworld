@@ -22,3 +22,45 @@ func formatWhereClause(where []string) string {
 	}
 	return " WHERE " + strings.Join(where, " AND ")
 }
+
+// func findMany(ctx context.Context, tx *sqlx.Tx, ss interface{}, query string, args ...interface{}) error {
+// 	rows, err := tx.QueryxContext(ctx, query, args...)
+
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	defer rows.Close()
+
+// 	if reflect.TypeOf(ss).Kind() != reflect.Ptr {
+// 		return fmt.Errorf("expecting a pointer to a slice")
+// 	}
+
+// 	if reflect.TypeOf(ss).Elem().Kind() != reflect.Slice {
+// 		return fmt.Errorf("expecting  a pointer to a slice")
+
+// 	}
+
+// 	sPtrVal := reflect.ValueOf(ss) // pointer to slice value
+// 	ssVal := sPtrVal.Elem()        // slice pointed to by ss
+// 	typ := ssVal.Type().Elem()     // type of slice elements
+
+// 	newSlice := reflect.MakeSlice(ssVal.Type(), 10, 10) // new slice
+
+// 	for rows.Next() {
+// 		newVal := reflect.New(typ)
+
+// 		if err := rows.StructScan(newVal.Interface()); err != nil {
+// 			return nil
+// 		}
+// 		newSlice = reflect.Append(newSlice, newVal)
+// 	}
+
+// 	if err := rows.Err(); err != nil {
+// 		return err
+// 	}
+
+// 	sPtrVal.Elem().Set(newSlice)
+
+// 	return nil
+// }
