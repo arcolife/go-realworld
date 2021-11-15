@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"strings"
 
 	"github.com/0xdod/go-realworld/conduit"
 	"github.com/jmoiron/sqlx"
@@ -61,7 +60,21 @@ func (us *UserService) UserByEmail(ctx context.Context, email string) (*conduit.
 }
 
 func (us *UserService) Users(ctx context.Context, uf conduit.UserFilter) ([]*conduit.User, error) {
-	return nil, nil
+	tx, err := us.db.BeginTxx(ctx, nil)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer tx.Rollback()
+
+	users, err := findUsers(ctx, tx, uf)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return users, nil
 }
 
 func (us *UserService) Authenticate(ctx context.Context, email, password string) (*conduit.User, error) {
@@ -128,19 +141,6 @@ func createUser(ctx context.Context, tx *sqlx.Tx, user *conduit.User) error {
 	return nil
 }
 
-// FormatLimitOffset returns a SQL string for a given limit & offset.
-// Clauses are only added if limit and/or offset are greater than zero.
-func FormatLimitOffset(limit, offset int) string {
-	if limit > 0 && offset > 0 {
-		return fmt.Sprintf("LIMIT %d OFFSET %d", limit, offset)
-	} else if limit > 0 {
-		return fmt.Sprintf("LIMIT %d", limit)
-	} else if offset > 0 {
-		return fmt.Sprintf("OFFSET %d", offset)
-	}
-	return ""
-}
-
 // findUserByEmail is a helper function to fetch a user by email.
 func findUserByEmail(ctx context.Context, tx *sqlx.Tx, email string) (*conduit.User, error) {
 	us, err := findUsers(ctx, tx, conduit.UserFilter{Email: &email})
@@ -184,8 +184,8 @@ func findUsers(ctx context.Context, tx *sqlx.Tx, filter conduit.UserFilter) ([]*
 	}
 
 	// Execute query to fetch user rows.
-	query := "SELECT * from users WHERE " + strings.Join(where, " AND ") + " ORDER BY id ASC" +
-		FormatLimitOffset(filter.Limit, filter.Offset)
+	query := "SELECT * from users" + formatWhereClause(where) + " ORDER BY id ASC" +
+		formatLimitOffset(filter.Limit, filter.Offset)
 	rows, err := tx.QueryxContext(ctx, query, args...)
 
 	if err != nil {

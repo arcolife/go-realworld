@@ -22,16 +22,10 @@ type Article struct {
 }
 
 func (a Article) MarshalJSON() ([]byte, error) {
-	type Author struct {
-		Username  string `json:"username"`
-		Bio       string `json:"bio"`
-		Image     string `json:"image"`
-		Following bool   `json:"following"`
-	}
-	var author Author
+	var author Profile
 
 	if a.Author != nil {
-		author = Author{
+		author = Profile{
 			Username: a.Author.Username,
 			Bio:      a.Author.Bio,
 			Image:    a.Author.Image,
@@ -42,10 +36,10 @@ func (a Article) MarshalJSON() ([]byte, error) {
 
 	aux := struct {
 		ArticleAlias
-		Author `json:"author"`
+		Profile `json:"author"`
 	}{
 		ArticleAlias: ArticleAlias(a),
-		Author:       author,
+		Profile:      author,
 	}
 
 	return json.Marshal(aux)

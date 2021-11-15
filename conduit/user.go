@@ -19,6 +19,22 @@ type User struct {
 	UpdatedAt    time.Time `json:"-" db:"updated_at"`
 }
 
+type Profile struct {
+	Username  string `json:"username"`
+	Bio       string `json:"bio"`
+	Image     string `json:"image"`
+	Following bool   `json:"following"`
+}
+
+
+func (u *User) Profile() *Profile {
+	return &Profile{
+		Username: u.Username,
+		Bio: u.Bio,
+		Image: u.Image,
+	}
+}
+
 var AnonymousUser User
 
 type UserFilter struct {

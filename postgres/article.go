@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"strings"
 
 	"github.com/0xdod/go-realworld/conduit"
 	"github.com/jmoiron/sqlx"
@@ -147,13 +146,7 @@ func findArticles(ctx context.Context, tx *sqlx.Tx, filter conduit.ArticleFilter
 		where, args = append(where, fmt.Sprintf(clause, argPosition)), append(args, *v)
 	}
 
-	whereClause := ""
-
-	if len(where) != 0 {
-		whereClause = " WHERE " + strings.Join(where, " AND ")
-	}
-
-	query := "SELECT * from articles" + whereClause + " ORDER BY id ASC"
+	query := "SELECT * from articles" + formatWhereClause(where) + " ORDER BY id ASC"
 
 	rows, err := tx.QueryxContext(ctx, query, args...)
 
