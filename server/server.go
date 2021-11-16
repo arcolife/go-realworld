@@ -15,6 +15,7 @@ type Server struct {
 	router         *mux.Router
 	userService    conduit.UserService
 	articleService conduit.ArticleService
+	tagService     conduit.TagService
 }
 
 func NewServer(db *postgres.DB) *Server {
@@ -29,8 +30,9 @@ func NewServer(db *postgres.DB) *Server {
 
 	s.routes()
 	s.userService = postgres.NewUserService(db)
-	s.articleService = postgres.NewArticleService(db)
-
+	as := postgres.NewArticleService(db)
+	s.articleService = as
+	s.tagService = as
 	s.server.Handler = s.router
 
 	return &s

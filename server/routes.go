@@ -17,6 +17,7 @@ func (s *Server) routes() {
 	optionalAuth.Use(s.authenticate(OptionalAuth))
 	{
 		optionalAuth.Handle("/profiles/{username}", s.getProfile()).Methods("GET")
+		optionalAuth.Handle("/tags", s.listTags()).Methods("GET")
 	}
 
 	noAuth := apiRouter.PathPrefix("").Subrouter()

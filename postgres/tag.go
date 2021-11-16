@@ -3,12 +3,27 @@ package postgres
 import (
 	"context"
 	"fmt"
-	"log"
-	"strings"
 
 	"github.com/0xdod/go-realworld/conduit"
 	"github.com/jmoiron/sqlx"
 )
+
+func (as *ArticleService) Tags(ctx context.Context, filter conduit.TagFilter) ([]*conduit.Tag, error) {
+	tx, err := as.db.BeginTxx(ctx, nil)
+
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	tags, err := findTags(ctx, tx, filter)
+
+	if err != nil {
+		return tags, err
+	}
+
+	return tags, tx.Commit()
+}
 
 func createTag(ctx context.Context, tx *sqlx.Tx, tag *conduit.Tag) error {
 	query := "INSERT INTO tags (name) VALUES ($1) RETURNING id"
@@ -23,7 +38,6 @@ func createTag(ctx context.Context, tx *sqlx.Tx, tag *conduit.Tag) error {
 }
 
 func findTags(ctx context.Context, tx *sqlx.Tx, filter conduit.TagFilter) ([]*conduit.Tag, error) {
-	// Build WHERE clause.
 	where, args := []string{}, []interface{}{}
 	argPosition := 0
 
@@ -32,32 +46,12 @@ func findTags(ctx context.Context, tx *sqlx.Tx, filter conduit.TagFilter) ([]*co
 		where, args = append(where, fmt.Sprintf("name = $%d", argPosition)), append(args, *v)
 	}
 
-	query := "SELECT * from tags WHERE " + strings.Join(where, " AND ") + " ORDER BY id ASC"
-	rows, err := tx.QueryxContext(ctx, query, args...)
+	query := "SELECT * from tags " + formatWhereClause(where) + " ORDER BY id ASC"
+	tags := make([]*conduit.Tag, 0)
+	err := findMany(ctx, tx, &tags, query, args...)
 
 	if err != nil {
-		log.Println(err)
-		return nil, err
-	}
-
-	defer rows.Close()
-
-	tags := make([]*conduit.Tag, 0)
-
-	for rows.Next() {
-		var tag conduit.Tag
-
-		if err := rows.StructScan(&tag); err != nil {
-			log.Println(err)
-			return nil, err
-		}
-
-		tags = append(tags, &tag)
-	}
-
-	if err := rows.Err(); err != nil {
-		log.Println(err)
-		return nil, err
+		return tags, err
 	}
 	return tags, nil
 }

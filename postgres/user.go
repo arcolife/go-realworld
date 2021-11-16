@@ -192,7 +192,6 @@ func (us *UserService) UnFollowUser(ctx context.Context, user, follower *conduit
 }
 
 func createUser(ctx context.Context, tx *sqlx.Tx, user *conduit.User) error {
-	// Execute insertion query.
 	query := `
 	INSERT INTO users (email, username, bio, image, password_hash)
 	VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at, updated_at
@@ -226,6 +225,7 @@ func findOneUser(ctx context.Context, tx *sqlx.Tx, filter conduit.UserFilter) (*
 	} else if len(us) == 0 {
 		return nil, conduit.ErrNotFound
 	}
+
 	return us[0], nil
 }
 

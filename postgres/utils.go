@@ -37,16 +37,18 @@ func findMany(ctx context.Context, tx *sqlx.Tx, ss interface{}, query string, ar
 
 	defer rows.Close()
 
-	sPtrVal, err := asSlicePtr(ss) // get the reflect.Value of the pointer to slice
+	sPtrVal, err := asSlicePtrValue(ss) // get the reflect.Value of the ptr to slice
+
 	if err != nil {
 		return err
 	}
+
 	sVal := sPtrVal.Elem()                           // get the relfect.Value of the slice pointed to by ss
 	newSlice := reflect.MakeSlice(sVal.Type(), 0, 0) // new slice
+	elemType := sliceElemType(sVal)                  // get the slice element's type
 
 	for rows.Next() {
-		typ := sVal.Type().Elem().Elem() // to get conduit.Article from []*conduit.Article
-		newVal := reflect.New(typ)
+		newVal := reflect.New(elemType) // create a new value of this type
 		if err := rows.StructScan(newVal.Interface()); err != nil {
 			return nil
 		}
@@ -57,21 +59,35 @@ func findMany(ctx context.Context, tx *sqlx.Tx, ss interface{}, query string, ar
 		return err
 	}
 
-	sPtrVal.Elem().Set(newSlice)
+	sPtrVal.Elem().Set(newSlice) // change the value pointed to be the ptr to slice to our new slice
 
 	return nil
 }
 
-func asSlicePtr(v interface{}) (reflect.Value, error) {
+// sliceElemType takes a reflect.Value which is a ptr to slice or a slice,
+// and returns the reflect.Type of the elements the slice holds.
+// If the slice holds a pointer type, it returns the type pointed to.
+func sliceElemType(v reflect.Value) reflect.Type {
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	vv := v.Type().Elem() // get the reflect.Type of the elements of the slice
+	if vv.Kind() == reflect.Ptr {
+		vv = vv.Elem() // if it is a pointer, get the type it points to
+	}
+
+	return vv
+}
+
+func isSlicePtr(v interface{}) bool {
 	typ := reflect.TypeOf(v)
 
-	if typ.Kind() != reflect.Ptr {
-		return reflect.Value{}, errors.New("expecting a pointer to a slice")
-	}
+	return typ.Kind() == reflect.Ptr && typ.Elem().Kind() == reflect.Slice
+}
 
-	if typ.Elem().Kind() != reflect.Slice {
-		return reflect.Value{}, errors.New("expecting  a pointer to a slice")
+func asSlicePtrValue(v interface{}) (reflect.Value, error) {
+	if !isSlicePtr(v) {
+		return reflect.Value{}, errors.New("expecting a pointer to slice")
 	}
-
 	return reflect.ValueOf(v), nil
 }

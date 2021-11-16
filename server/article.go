@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"github.com/0xdod/go-realworld/conduit"
-	"github.com/0xdod/go-realworld/pkg"
 	"github.com/gorilla/mux"
+	"github.com/gosimple/slug"
 )
 
 func (s *Server) createArticle() http.HandlerFunc {
@@ -33,7 +33,7 @@ func (s *Server) createArticle() http.HandlerFunc {
 		article := conduit.Article{
 			Title:       input.Article.Title,
 			Body:        input.Article.Body,
-			Slug:        pkg.Slugify(input.Article.Title),
+			Slug:        slug.Make(input.Article.Title),
 			Description: input.Article.Description,
 		}
 
@@ -106,7 +106,14 @@ func (s *Server) getArticle() http.HandlerFunc {
 }
 
 func (s *Server) listTags() http.HandlerFunc {
-	return func (w http.ResponseWriter, r *http.Request) {
-		
+	return func(w http.ResponseWriter, r *http.Request) {
+		tags, err := s.tagService.Tags(r.Context(), conduit.TagFilter{})
+
+		if err != nil {
+			serverError(w, err)
+			return
+		}
+
+		writeJSON(w, http.StatusOK, M{"tags": tags})
 	}
 }

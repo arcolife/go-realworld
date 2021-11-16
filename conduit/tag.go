@@ -1,12 +1,13 @@
 package conduit
 
 import (
+	"context"
 	"strconv"
 )
 
 type Tag struct {
-	ID   uint   `json:"-"`
-	Name string `json:"name"`
+	ID   uint
+	Name string
 }
 
 func (t Tag) MarshalJSON() ([]byte, error) {
@@ -16,4 +17,8 @@ func (t Tag) MarshalJSON() ([]byte, error) {
 
 type TagFilter struct {
 	Name *string
+}
+
+type TagService interface {
+	Tags(context.Context, TagFilter) ([]*Tag, error)
 }
