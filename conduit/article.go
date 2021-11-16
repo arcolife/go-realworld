@@ -2,7 +2,6 @@ package conduit
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 )
 
@@ -11,38 +10,25 @@ type Article struct {
 	Title          string    `json:"title"`
 	Body           string    `json:"body"`
 	Description    string    `json:"description"`
-	AuthorID       uint      `json:"-" db:"author_id"`
-	Author         *User     `json:"author"`
 	Favorited      bool      `json:"favorited"`
 	FavoritesCount uint      `json:"favoritesCount" db:"favorites_count"`
 	Slug           string    `json:"slug"`
+	AuthorID       uint      `json:"-" db:"author_id"`
+	Author         *User     `json:"-"`
+	AuthorProfile  *Profile  `json:"author"`
 	Tags           []*Tag    `json:"tagList"`
 	CreatedAt      time.Time `json:"createdAt" db:"created_at"`
 	UpdatedAt      time.Time `json:"updatedAt" db:"updated_at"`
 }
 
-func (a Article) MarshalJSON() ([]byte, error) {
-	var author Profile
-
-	if a.Author != nil {
-		author = Profile{
-			Username: a.Author.Username,
-			Bio:      a.Author.Bio,
-			Image:    a.Author.Image,
-		}
+func (a *Article) SetAuthorProfile(currentUser *User) {
+	a.AuthorProfile = &Profile{
+		Username: a.Author.Username,
+		Bio:      a.Author.Bio,
+		Image:    a.Author.Image,
 	}
 
-	type ArticleAlias Article
-
-	aux := struct {
-		ArticleAlias
-		Profile `json:"author"`
-	}{
-		ArticleAlias: ArticleAlias(a),
-		Profile:      author,
-	}
-
-	return json.Marshal(aux)
+	a.AuthorProfile.Following = currentUser.IsFollowing(a.Author)
 }
 
 type ArticleFilter struct {
@@ -60,19 +46,21 @@ type ArticleFilter struct {
 
 type ArticlePatch struct {
 	Title       *string
+	Body        *string
 	Description *string
 	Tags        []Tag
 }
 
 type Favorite struct {
-	UserID uint
-	PostID uint
+	UserID    uint
+	ArticleID uint
 }
 
 type ArticleService interface {
 	CreateArticle(context.Context, *Article) error
-	ArticleByID(context.Context, uint) error
+	ArticleBySlug(context.Context, string) (*Article, error)
 	Articles(context.Context, ArticleFilter) ([]*Article, error)
+	ArticleFeed(context.Context, *User, ArticleFilter) ([]*Article, error)
 	UpdateArticle(context.Context, *Article, ArticlePatch) error
 	DeleteArticle(context.Context, uint) error
 }

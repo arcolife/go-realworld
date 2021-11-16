@@ -64,6 +64,16 @@ func findMany(ctx context.Context, tx *sqlx.Tx, ss interface{}, query string, ar
 	return nil
 }
 
+func findOne(ctx context.Context, tx *sqlx.Tx, dest interface{}, query string, args ...interface{}) error {
+	s, err := asStructPtr(dest)
+
+	if err != nil {
+		panic(err)
+	}
+
+	return tx.QueryRowxContext(ctx, query, args...).StructScan(s.Interface())
+}
+
 // sliceElemType takes a reflect.Value which is a ptr to slice or a slice,
 // and returns the reflect.Type of the elements the slice holds.
 // If the slice holds a pointer type, it returns the type pointed to.
@@ -72,6 +82,7 @@ func sliceElemType(v reflect.Value) reflect.Type {
 		v = v.Elem()
 	}
 	vv := v.Type().Elem() // get the reflect.Type of the elements of the slice
+
 	if vv.Kind() == reflect.Ptr {
 		vv = vv.Elem() // if it is a pointer, get the type it points to
 	}
@@ -90,4 +101,20 @@ func asSlicePtrValue(v interface{}) (reflect.Value, error) {
 		return reflect.Value{}, errors.New("expecting a pointer to slice")
 	}
 	return reflect.ValueOf(v), nil
+}
+
+//
+func asStructPtr(v interface{}) (reflect.Value, error) {
+	vType := reflect.TypeOf(v)
+
+	if vType.Kind() != reflect.Ptr && vType.Elem().Kind() != reflect.Struct {
+		return reflect.Value{}, errors.New("expecting a pointer to struct type")
+	}
+
+	return reflect.ValueOf(v), nil
+}
+
+func execQuery(ctx context.Context, tx *sqlx.Tx, query string, args ...interface{}) error {
+	_, err := tx.ExecContext(ctx, query, args...)
+	return err
 }

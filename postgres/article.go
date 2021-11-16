@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/0xdod/go-realworld/conduit"
 	"github.com/jmoiron/sqlx"
@@ -33,8 +34,22 @@ func (as *ArticleService) CreateArticle(ctx context.Context, article *conduit.Ar
 	return tx.Commit()
 }
 
-func (as *ArticleService) ArticleByID(_ context.Context, _ uint) error {
-	panic("not implemented") // TODO: Implement
+func (as *ArticleService) ArticleBySlug(ctx context.Context, slug string) (*conduit.Article, error) {
+	tx, err := as.db.BeginTxx(ctx, nil)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer tx.Rollback()
+
+	article, err := findArticleBySlug(ctx, tx, slug)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return article, tx.Commit()
 }
 
 func (as *ArticleService) Articles(ctx context.Context, filter conduit.ArticleFilter) ([]*conduit.Article, error) {
@@ -52,21 +67,61 @@ func (as *ArticleService) Articles(ctx context.Context, filter conduit.ArticleFi
 		return nil, err
 	}
 
-	for _, article := range articles {
-		if err := attachArticleAssociations(ctx, tx, article); err != nil {
-			return nil, err
-		}
+	return articles, tx.Commit()
+}
+
+func (as *ArticleService) ArticleFeed(ctx context.Context, user *conduit.User, filter conduit.ArticleFilter) ([]*conduit.Article, error) {
+	tx, err := as.db.BeginTxx(ctx, nil)
+
+	if err != nil {
+		return nil, err
 	}
 
-	return articles, nil
+	defer tx.Rollback()
+
+	articles, err := getArticlesFromUserFollowings(ctx, tx, user, filter)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return articles, tx.Commit()
 }
 
-func (as *ArticleService) UpdateArticle(_ context.Context, _ *conduit.Article, _ conduit.ArticlePatch) error {
-	panic("not implemented") // TODO: Implement
+func (as *ArticleService) UpdateArticle(ctx context.Context, article *conduit.Article, filter conduit.ArticlePatch) error {
+	tx, err := as.db.BeginTxx(ctx, nil)
+
+	if err != nil {
+		return err
+	}
+
+	defer tx.Rollback()
+
+	err = updateArticle(ctx, tx, article, filter)
+
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
-func (as *ArticleService) DeleteArticle(_ context.Context, _ uint) error {
-	panic("not implemented") // TODO: Implement
+func (as *ArticleService) DeleteArticle(ctx context.Context, id uint) error {
+	tx, err := as.db.BeginTxx(ctx, nil)
+
+	if err != nil {
+		return err
+	}
+
+	defer tx.Rollback()
+
+	err = deleteArticle(ctx, tx, id)
+
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func createArticle(ctx context.Context, tx *sqlx.Tx, article *conduit.Article) error {
@@ -102,6 +157,21 @@ func createArticle(ctx context.Context, tx *sqlx.Tx, article *conduit.Article) e
 	}
 
 	return nil
+}
+
+func findArticleBySlug(ctx context.Context, tx *sqlx.Tx, slug string) (*conduit.Article, error) {
+	filter := conduit.ArticleFilter{Slug: &slug}
+	articles, err := findArticles(ctx, tx, filter)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if len(articles) == 0 {
+		return nil, conduit.ErrNotFound
+	}
+
+	return articles[0], err
 }
 
 func findArticles(ctx context.Context, tx *sqlx.Tx, filter conduit.ArticleFilter) ([]*conduit.Article, error) {
@@ -142,11 +212,13 @@ func findArticles(ctx context.Context, tx *sqlx.Tx, filter conduit.ArticleFilter
 		where, args = append(where, fmt.Sprintf(clause, argPosition)), append(args, *v)
 	}
 
-	query := "SELECT * from articles" + formatWhereClause(where) + " ORDER BY id ASC"
-	articles := make([]*conduit.Article, 0)
-	if err := findMany(ctx, tx, &articles, query, args...); err != nil {
+	query := "SELECT * from articles" + formatWhereClause(where) + " ORDER BY created_at DESC"
+	articles, err := queryArticles(ctx, tx, query, args...)
+
+	if err != nil {
 		return articles, err
 	}
+
 	return articles, nil
 }
 
@@ -209,6 +281,12 @@ func attachArticleAssociations(ctx context.Context, tx *sqlx.Tx, article *condui
 
 }
 
+func deleteArticle(ctx context.Context, tx *sqlx.Tx, id uint) error {
+	query := "DELETE FROM articles WHERE id = $1"
+
+	return execQuery(ctx, tx, query, id)
+}
+
 func findArticleTags(ctx context.Context, tx *sqlx.Tx, article *conduit.Article) ([]*conduit.Tag, error) {
 	query := `
 	SELECT * from tags WHERE id IN (
@@ -220,4 +298,64 @@ func findArticleTags(ctx context.Context, tx *sqlx.Tx, article *conduit.Article)
 		return tags, err
 	}
 	return tags, nil
+}
+
+func getArticlesFromUserFollowings(ctx context.Context, tx *sqlx.Tx, user *conduit.User, filter conduit.ArticleFilter) ([]*conduit.Article, error) {
+	query := `
+	SELECT * from articles as a WHERE author_id IN (
+		SELECT following_id from followings WHERE follower_id = $1 
+	) ORDER BY a.created_at DESC
+	` + formatLimitOffset(filter.Limit, filter.Offset)
+
+	return queryArticles(ctx, tx, query, user.ID)
+}
+
+func queryArticles(ctx context.Context, tx *sqlx.Tx, query string, args ...interface{}) ([]*conduit.Article, error) {
+	articles := make([]*conduit.Article, 0)
+	err := findMany(ctx, tx, &articles, query, args...)
+
+	if err != nil {
+		return articles, err
+	}
+
+	for _, article := range articles {
+		if err := attachArticleAssociations(ctx, tx, article); err != nil {
+			return nil, err
+		}
+	}
+
+	return articles, nil
+}
+
+func updateArticle(ctx context.Context, tx *sqlx.Tx, article *conduit.Article, patch conduit.ArticlePatch) error {
+	if v := patch.Body; v != nil {
+		article.Body = *v
+	}
+
+	if v := patch.Title; v != nil {
+		article.Title = *v
+	}
+
+	if v := patch.Description; v != nil {
+		article.Description = *v
+	}
+
+	args := []interface{}{
+		article.Body,
+		article.Title,
+		article.Description,
+		article.ID,
+	}
+
+	query := `
+	UPDATE articles 
+	SET body = $1, title = $2, description = $3, updated_at = NOW() WHERE id = $4
+	RETURNING updated_at`
+
+	if err := tx.QueryRowxContext(ctx, query, args...).Scan(&article.UpdatedAt); err != nil {
+		log.Printf("error updating record: %v", err)
+		return conduit.ErrInternal
+	}
+
+	return nil
 }

@@ -336,8 +336,3 @@ func queryUsers(ctx context.Context, tx *sqlx.Tx, query string, args ...interfac
 
 	return users, nil
 }
-
-func execQuery(ctx context.Context, tx *sqlx.Tx, query string, args ...interface{}) error {
-	_, err := tx.ExecContext(ctx, query, args...)
-	return err
-}

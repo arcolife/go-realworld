@@ -17,6 +17,9 @@ func (t Tag) MarshalJSON() ([]byte, error) {
 
 type TagFilter struct {
 	Name *string
+
+	Limit  int
+	Offset int
 }
 
 type TagService interface {
