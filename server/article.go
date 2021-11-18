@@ -367,3 +367,34 @@ func (s *Server) getArticleComments() http.HandlerFunc {
 		writeJSON(w, http.StatusOK, M{"comments": comments})
 	}
 }
+
+func (s *Server) deleteComment() http.HandlerFunc {
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		idInt, _ := strconv.Atoi(vars["comment_id"])
+
+		comment, err := s.commentService.CommentByID(r.Context(), uint(idInt))
+
+		if err != nil {
+			if errors.Is(err, conduit.ErrNotFound) {
+				notFoundError(w, ErrorM{"comment": []string{"comment not found"}})
+			} else {
+				serverError(w, err)
+			}
+			return
+		}
+
+		if comment.AuthorID != userFromContext(r.Context()).ID {
+			errorResponse(w, http.StatusForbidden, "not permitted to delete comment")
+			return
+		}
+
+		if err := s.commentService.DeleteComment(r.Context(), comment.ID); err != nil {
+			serverError(w, err)
+			return
+		}
+
+		writeJSON(w, http.StatusNoContent, nil)
+	}
+}

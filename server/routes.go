@@ -40,6 +40,7 @@ func (s *Server) routes() {
 		authApiRoutes.Handle("/articles/{slug}", s.deleteArticle()).Methods("DELETE")
 		authApiRoutes.Handle("/articles/{slug}/comment", s.addComment()).Methods("POST")
 		authApiRoutes.Handle("/articles/{slug}/comments", s.getArticleComments()).Methods("GET")
+		authApiRoutes.Handle("/articles/{slug}/comments/{comment_id}", s.deleteComment()).Methods("DELETE")
 		authApiRoutes.Handle("/articles/{slug}/favorite", s.favoriteAction("favorite")).Methods("POST")
 		authApiRoutes.Handle("/articles/{slug}/favorite", s.favoriteAction("unfavorite")).Methods("DELETE")
 		authApiRoutes.Handle("/profiles/{username}/follow", s.followAction("follow")).Methods("POST")

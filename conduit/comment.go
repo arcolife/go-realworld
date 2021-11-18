@@ -37,7 +37,7 @@ type CommentFilter struct {
 
 type CommentService interface {
 	CreateComment(context.Context, *Comment) error
-	Comment(context.Context, uint) error
+	CommentByID(context.Context, uint) (*Comment, error)
 	Comments(context.Context, CommentFilter) ([]*Comment, error)
 	DeleteComment(context.Context, uint) error
 }

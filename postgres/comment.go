@@ -34,8 +34,23 @@ func (cs *CommentService) CreateComment(ctx context.Context, comment *conduit.Co
 	return tx.Commit()
 }
 
-func (cs *CommentService) Comment(ctx context.Context, id uint) error {
-	panic("not implemented") // TODO: Implement
+func (cs *CommentService) CommentByID(ctx context.Context, id uint) (*conduit.Comment, error) {
+	tx, err := cs.BeginTxx(ctx, nil)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer tx.Rollback()
+
+	comment, err := findCommentByID(ctx, tx, id)
+
+	if err != nil {
+		return comment, err
+	}
+
+	return comment, tx.Commit()
+
 }
 
 func (cs *CommentService) Comments(ctx context.Context, cf conduit.CommentFilter) ([]*conduit.Comment, error) {
@@ -57,7 +72,19 @@ func (cs *CommentService) Comments(ctx context.Context, cf conduit.CommentFilter
 }
 
 func (cs *CommentService) DeleteComment(ctx context.Context, id uint) error {
-	panic("not implemented") // TODO: Implement
+	tx, err := cs.BeginTxx(ctx, nil)
+
+	if err != nil {
+		return err
+	}
+
+	defer tx.Rollback()
+
+	if err := deleteComments(ctx, tx, id); err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func createComment(ctx context.Context, tx *sqlx.Tx, comment *conduit.Comment) error {
@@ -118,6 +145,19 @@ func findComments(ctx context.Context, tx *sqlx.Tx, filter conduit.CommentFilter
 	return comments, nil
 }
 
+func findCommentByID(ctx context.Context, tx *sqlx.Tx, id uint) (*conduit.Comment, error) {
+	cf := conduit.CommentFilter{ID: &id}
+	cs, err := findComments(ctx, tx, cf)
+
+	if err != nil {
+		return nil, err
+	} else if len(cs) == 0 {
+		return nil, conduit.ErrNotFound
+	}
+
+	return cs[0], nil
+}
+
 func attachCommentAuthor(ctx context.Context, tx *sqlx.Tx, comment *conduit.Comment) error {
 	user, err := findUserByID(ctx, tx, comment.AuthorID)
 
@@ -127,4 +167,10 @@ func attachCommentAuthor(ctx context.Context, tx *sqlx.Tx, comment *conduit.Comm
 
 	comment.Author = user
 	return nil
+}
+
+func deleteComments(ctx context.Context, tx *sqlx.Tx, id uint) error {
+	query := "DELETE FROM comments WHERE id = $1"
+
+	return execQuery(ctx, tx, query, id)
 }
