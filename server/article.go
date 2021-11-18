@@ -70,15 +70,20 @@ func (s *Server) listArticles() http.HandlerFunc {
 			filter.Tag = &v
 		}
 
+		if v := query.Get("favorited"); v != "" {
+			filter.FavoritedBy = &v
+		}
+
 		articles, err := s.articleService.Articles(r.Context(), filter)
 
 		if err != nil {
 			serverError(w, err)
 			return
 		}
-
+		user := userFromContext(r.Context())
 		for _, a := range articles {
-			a.SetAuthorProfile(userFromContext(r.Context()))
+			a.SetAuthorProfile(user)
+			a.Favorited = a.UserHasFavorite(user)
 		}
 
 		writeJSON(w, http.StatusOK, M{"articles": articles})
@@ -234,5 +239,131 @@ func (s *Server) deleteArticle() http.HandlerFunc {
 		}
 
 		writeJSON(w, http.StatusNoContent, nil)
+	}
+}
+
+func (s *Server) addComment() http.HandlerFunc {
+	type Input struct {
+		Comment struct {
+			Body string `json:"body" validate:"required"`
+		} `json:"comment" validate:"required"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		input := Input{}
+
+		if err := readJSON(r.Body, &input); err != nil {
+			badRequestError(w)
+			return
+		}
+
+		if err := validate.Struct(input.Comment); err != nil {
+			validationError(w, err)
+			return
+		}
+
+		ctx := r.Context()
+		user := userFromContext(ctx)
+		slug := mux.Vars(r)["slug"]
+		article, err := s.articleService.ArticleBySlug(ctx, slug)
+
+		if err != nil {
+			switch {
+			case errors.Is(err, conduit.ErrNotFound):
+				err := ErrorM{"article": []string{"requested article not found"}}
+				notFoundError(w, err)
+			default:
+				serverError(w, err)
+			}
+			return
+		}
+
+		comment := conduit.Comment{
+			Body:          input.Comment.Body,
+			AuthorID:      user.ID,
+			ArticleID:     article.ID,
+			AuthorProfile: user.Profile(),
+		}
+
+		if err := s.commentService.CreateComment(ctx, &comment); err != nil {
+			serverError(w, err)
+			return
+		}
+
+		writeJSON(w, http.StatusOK, M{"comment": comment})
+	}
+}
+
+func (s *Server) favoriteAction(action string) http.HandlerFunc {
+	const (
+		Favorite   = "favorite"
+		UnFavorite = "unfavorite"
+	)
+	return func(w http.ResponseWriter, r *http.Request) {
+		slug := mux.Vars(r)["slug"]
+		article, err := s.articleService.ArticleBySlug(r.Context(), slug)
+
+		if err != nil {
+			if errors.Is(err, conduit.ErrNotFound) {
+				notFoundError(w, ErrorM{"article": []string{"article not found"}})
+			} else {
+				serverError(w, err)
+			}
+			return
+		}
+
+		user := userFromContext(r.Context())
+
+		switch isFavorited := article.UserHasFavorite(user); action {
+		case Favorite:
+			if !isFavorited {
+				err = s.articleService.FavoriteArticle(r.Context(), user.ID, article)
+			}
+		case UnFavorite:
+			if isFavorited {
+				err = s.articleService.UnfavoriteArticle(r.Context(), user.ID, article)
+			}
+		}
+
+		if err != nil {
+			serverError(w, err)
+			return
+		}
+
+		article.SetAuthorProfile(user)
+		writeJSON(w, http.StatusOK, M{"article": article})
+	}
+}
+
+func (s *Server) getArticleComments() http.HandlerFunc {
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		slug := mux.Vars(r)["slug"]
+		article, err := s.articleService.ArticleBySlug(r.Context(), slug)
+
+		if err != nil {
+			if errors.Is(err, conduit.ErrNotFound) {
+				notFoundError(w, ErrorM{"article": []string{"article not found"}})
+			} else {
+				serverError(w, err)
+			}
+			return
+		}
+
+		cf := conduit.CommentFilter{ArticleID: &article.ID}
+		comments, err := s.commentService.Comments(r.Context(), cf)
+
+		if err != nil {
+			serverError(w, err)
+			return
+		}
+
+		user := userFromContext(r.Context())
+
+		for _, c := range comments {
+			c.SetAuthorProfile(user)
+		}
+
+		writeJSON(w, http.StatusOK, M{"comments": comments})
 	}
 }

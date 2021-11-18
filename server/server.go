@@ -16,6 +16,7 @@ type Server struct {
 	userService    conduit.UserService
 	articleService conduit.ArticleService
 	tagService     conduit.TagService
+	commentService conduit.CommentService
 }
 
 func NewServer(db *postgres.DB) *Server {
@@ -29,10 +30,12 @@ func NewServer(db *postgres.DB) *Server {
 	}
 
 	s.routes()
-	s.userService = postgres.NewUserService(db)
+
 	as := postgres.NewArticleService(db)
+	s.userService = postgres.NewUserService(db)
 	s.articleService = as
 	s.tagService = as
+	s.commentService = postgres.NewCommentService(db)
 	s.server.Handler = s.router
 
 	return &s

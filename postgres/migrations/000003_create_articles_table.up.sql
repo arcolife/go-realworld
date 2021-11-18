@@ -5,7 +5,6 @@ CREATE TABLE IF NOT EXISTS articles (
     title TEXT NOT NULL,
     body TEXT NOT NULL,
     description TEXT,
-    favorites_count INT NOT NULL DEFAULT 0,
     slug VARCHAR(255) NOT NULL UNIQUE,
     author_id  INT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

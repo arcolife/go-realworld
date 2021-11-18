@@ -10,6 +10,8 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+var _ conduit.ArticleService = (*ArticleService)(nil)
+
 type ArticleService struct {
 	db *DB
 }
@@ -103,6 +105,46 @@ func (as *ArticleService) UpdateArticle(ctx context.Context, article *conduit.Ar
 		return err
 	}
 
+	return tx.Commit()
+}
+
+func (as *ArticleService) FavoriteArticle(ctx context.Context, userID uint, article *conduit.Article) error {
+	tx, err := as.db.BeginTxx(ctx, nil)
+
+	if err != nil {
+		return err
+	}
+
+	defer tx.Rollback()
+
+	if err := favoriteAction(ctx, tx, userID, article.ID, "favorite"); err != nil {
+		return err
+	}
+
+	//
+	article.Favorited = true
+	article.FavoritesCount += 1
+	//
+	return tx.Commit()
+}
+
+func (as *ArticleService) UnfavoriteArticle(ctx context.Context, userID uint, article *conduit.Article) error {
+	tx, err := as.db.BeginTxx(ctx, nil)
+
+	if err != nil {
+		return err
+	}
+
+	defer tx.Rollback()
+
+	if err := favoriteAction(ctx, tx, userID, article.ID, "unfavorite"); err != nil {
+		return err
+	}
+
+	//
+	article.Favorited = false
+	article.FavoritesCount -= 1
+	//
 	return tx.Commit()
 }
 
@@ -212,6 +254,14 @@ func findArticles(ctx context.Context, tx *sqlx.Tx, filter conduit.ArticleFilter
 		where, args = append(where, fmt.Sprintf(clause, argPosition)), append(args, *v)
 	}
 
+	if v := filter.FavoritedBy; v != nil {
+		argPosition++
+		clause := `id IN (select article_id from favorites where user_id = (
+			select id from users where username = $%d LIMIT 1)
+			)`
+		where, args = append(where, fmt.Sprintf(clause, argPosition)), append(args, *v)
+	}
+
 	query := "SELECT * from articles" + formatWhereClause(where) + " ORDER BY created_at DESC"
 	articles, err := queryArticles(ctx, tx, query, args...)
 
@@ -276,6 +326,19 @@ func attachArticleAssociations(ctx context.Context, tx *sqlx.Tx, article *condui
 	}
 
 	article.Author = user
+
+	query := `SELECT * from users WHERE id IN (
+		SELECT user_id FROM favorites WHERE article_id = $1
+	)`
+
+	favourites := make([]*conduit.User, 0)
+
+	if err := findMany(ctx, tx, &favourites, query, article.ID); err != nil {
+		return err
+	}
+
+	article.FavoritedBy = favourites
+	article.FavoritesCount = int64(len(favourites))
 
 	return nil
 
@@ -358,4 +421,18 @@ func updateArticle(ctx context.Context, tx *sqlx.Tx, article *conduit.Article, p
 	}
 
 	return nil
+}
+
+func favoriteAction(ctx context.Context, tx *sqlx.Tx, userID, articleID uint, action string) error {
+	query := ""
+	switch action {
+	case "favorite":
+		query = "INSERT INTO favorites (user_id, article_id) VALUES ($1, $2)"
+	case "unfavorite":
+		query = "DELETE FROM favorites WHERE user_id = $1 AND article_id = $2"
+	default:
+		panic("favoriteAction: action should be either favorite or unfavorite")
+	}
+
+	return execQuery(ctx, tx, query, userID, articleID)
 }

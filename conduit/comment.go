@@ -6,7 +6,7 @@ import (
 )
 
 type Comment struct {
-	ID            uint      `json:"-"`
+	ID            uint      `json:"id"`
 	ArticleID     uint      `json:"-" db:"article_id"`
 	Article       *Article  `json:"-"`
 	AuthorID      uint      `json:"-" db:"author_id"`
@@ -14,12 +14,22 @@ type Comment struct {
 	AuthorProfile *Profile  `json:"author"`
 	Body          string    `json:"body"`
 	CreatedAt     time.Time `json:"createdAt" db:"created_at"`
-	UpdatedAt     time.Time `json:"updatedAt" db:"updated_at"`
+}
+
+func (c *Comment) SetAuthorProfile(currentUser *User) {
+	c.AuthorProfile = &Profile{
+		Username: c.Author.Username,
+		Bio:      c.Author.Bio,
+		Image:    c.Author.Image,
+	}
+
+	c.AuthorProfile.Following = currentUser.IsFollowing(c.Author)
 }
 
 type CommentFilter struct {
 	ID        *uint
 	ArticleID *uint
+	AuthorID  *uint
 
 	Limit  int
 	Offset int
