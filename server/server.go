@@ -3,6 +3,7 @@ package server
 import (
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/0xdod/go-realworld/conduit"
@@ -42,6 +43,9 @@ func NewServer(db *postgres.DB) *Server {
 }
 
 func (s *Server) Run(port string) error {
+	if !strings.HasPrefix(port, ":") {
+		port = ":" + port
+	}
 	s.server.Addr = port
 	log.Printf("server starting on %s", port)
 	return s.server.ListenAndServe()

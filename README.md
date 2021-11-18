@@ -18,10 +18,16 @@ For more information on how to this works with other frontends/backends, head ov
 The project structure was inspired by two posts on [Ben Johnson's](https://twitter.com/benbjohnson) blog which can be found [here](https://www.gobeyond.dev/packages-as-layers/) and [here](https://www.gobeyond.dev/standard-package-layout/).
 
 # Getting started
+This project uses Go version 1.17 and postgresql 14
+You also need to have [migrate](https://github.com/golang-migrate/migrate) tool installed to run all migrations against the database
 #### Locally
-- make sure Go is installed, (check here)[https://golang.org/dl] on how to install it if not.
+- make sure [Go](https://golang.org/dl) is installed on your machine.
 - make sure to have the postgresql database installed locally or remote
+- set the .env file or env var as shown in the .env.example file
+- run the migrations in postgres/migrations or run `make run-migrate`
+- fetch all dependencies using `go mod download`
+- run `make run` to start the server locally
  
 
-#### Docker
-
+#### TODO
+- Revisit error handling
