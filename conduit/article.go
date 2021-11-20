@@ -60,6 +60,7 @@ type ArticlePatch struct {
 	Title       *string
 	Body        *string
 	Description *string
+	Slug        *string
 	Tags        []Tag
 }
 

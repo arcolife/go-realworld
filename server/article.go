@@ -8,6 +8,7 @@ import (
 	"github.com/0xdod/go-realworld/conduit"
 	"github.com/gorilla/mux"
 	"github.com/gosimple/slug"
+	goslug "github.com/gosimple/slug"
 )
 
 func (s *Server) createArticle() http.HandlerFunc {
@@ -182,6 +183,10 @@ func (s *Server) updateArticle() http.HandlerFunc {
 			Title:       input.Article.Title,
 			Body:        input.Article.Body,
 			Description: input.Article.Description,
+		}
+
+		if patch.Title != nil {
+			*patch.Slug = goslug.Make(*patch.Title)
 		}
 
 		if err := s.articleService.UpdateArticle(r.Context(), article, patch); err != nil {

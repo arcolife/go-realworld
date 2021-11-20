@@ -2,6 +2,8 @@ package server
 
 import (
 	"os"
+
+	"github.com/rs/cors"
 )
 
 const (
@@ -10,6 +12,7 @@ const (
 )
 
 func (s *Server) routes() {
+	s.router.Use(cors.AllowAll().Handler)
 	s.router.Use(Logger(os.Stdout))
 	apiRouter := s.router.PathPrefix("/api/v1").Subrouter()
 
