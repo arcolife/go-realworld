@@ -116,5 +116,6 @@ func asSlicePtrValue(v interface{}) (reflect.Value, error) {
 
 func execQuery(ctx context.Context, tx *sqlx.Tx, query string, args ...interface{}) error {
 	_, err := tx.ExecContext(ctx, query, args...)
+
 	return err
 }
