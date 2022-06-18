@@ -1,4 +1,4 @@
-POSTGRESQL_URL="postgres://admin:admin@localhost:5432/conduit?sslmode=disable"
+# POSTGRESQL_URL="postgres://admin:admin@localhost:5432/conduit?sslmode=disable"
 
 run:
 	go run main.go
